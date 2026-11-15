@@ -192,12 +192,14 @@
   /* ---------- timeline ---------- */
   function runs(arr) { const out = []; let s = 0; for (let i = 1; i <= arr.length; i++) { if (i === arr.length || arr[i] !== arr[s]) { out.push([s, i, arr[s]]); s = i; } } return out; }
   function renderTimeline() {
-    const svg = $('tl'); const W = Math.max(600, svg.clientWidth || 1000), H = 300;
+    const svg = $('tl'); const W = Math.max(300, svg.clientWidth || 1000), H = 300; const narrow = W < 700;
     svg.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
-    const L = 150, Rm = 12, n = data.length;
+    const L = narrow ? 76 : 150, Rm = narrow ? 6 : 12, n = data.length;
     const x = i => L + (i / n) * (W - L - Rm);
     let h = '';
-    const lab = (y, t, sub) => '<text x="8" y="' + y + '" font-size="12" font-weight="700" fill="#17201b">' + t + '</text>' + (sub ? '<text x="8" y="' + (y + 13) + '" font-size="10" fill="#5d665f">' + sub + '</text>' : '');
+    const SHORT = { 'Two height tower': 'Tower', 'Ground station only': 'Ground only', 'Risk it missed': 'Missed', 'Temp difference': 'Temp diff', 'Wind speed': 'Wind mph' };
+    const lab = (y, t, sub) => narrow ? '<text x="2" y="' + y + '" font-size="11" font-weight="700" fill="#17201b">' + SHORT[t] + '</text>' :
+      '<text x="8" y="' + y + '" font-size="12" font-weight="700" fill="#17201b">' + t + '</text>' + (sub ? '<text x="8" y="' + (y + 13) + '" font-size="10" fill="#5d665f">' + sub + '</text>' : '');
     // ribbons
     h += lab(26, 'Two height tower');
     runs(evals.map(e => e.status)).forEach(([a, b, s]) => { h += '<rect x="' + x(a) + '" y="8" width="' + (x(b) - x(a) + 0.5) + '" height="28" fill="' + COL[s] + '"/>'; });
@@ -220,7 +222,7 @@
     h += '<polyline fill="none" stroke="#0b6e99" stroke-width="2" points="' + data.map((r, i) => x(i + 0.5).toFixed(1) + ',' + yb(r.wLo).toFixed(1)).join(' ') + '"/>';
     h += '<text x="' + (W - Rm - 4) + '" y="' + (bT + 10) + '" text-anchor="end" font-size="10" fill="#c2410c">' + cfg.hiLabel + '</text><text x="' + (W - Rm - 40) + '" y="' + (bT + 10) + '" text-anchor="end" font-size="10" fill="#0b6e99">' + cfg.loLabel + '</text>';
     // hours
-    for (let hr = 0; hr <= 24; hr += 2) {
+    for (let hr = 0; hr <= 24; hr += (narrow ? 6 : 2)) {
       const xi = L + (hr / 24) * (W - L - Rm);
       h += '<line x1="' + xi + '" y1="8" x2="' + xi + '" y2="272" stroke="#000" opacity=".07"/>';
       if (hr < 24) h += '<text x="' + (xi + 3) + '" y="290" font-size="11" fill="#5d665f">' + fmtTime(hr * 60).replace(':00', '') + '</text>';
@@ -240,7 +242,7 @@
     $('tlfoot').innerHTML = 'Today a ground station alone would have said "looks fine" for <b>' + f1(missedH) + ' hours</b> that the tower flagged, including <b>' + f1(stopMiss) + ' hours</b> the tower called STOP.';
   }
   function tlPick(evn) {
-    const svg = $('tl'); const rect = svg.getBoundingClientRect(); const W = rect.width; const L = 150, Rm = 12;
+    const svg = $('tl'); const rect = svg.getBoundingClientRect(); const W = rect.width; const L = W < 700 ? 76 : 150, Rm = W < 700 ? 6 : 12;
     const f = (evn.clientX - rect.left - L) / (W - L - Rm);
     if (f < 0 || f > 1) return; jump(Math.min(data.length - 1, Math.floor(f * data.length)));
   }
@@ -530,6 +532,7 @@
   }
   function initNetwork() {
     $('repBtn').onclick = sendReport; renderNetwork(); pullNetwork(false);
+    $('fab').onclick = () => { $('network').scrollIntoView({ behavior: 'smooth' }); };
     setInterval(() => pullNetwork(true), 8000);
     ['lat', 'lon'].forEach(id => $(id).addEventListener('change', () => applyNetwork(false)));
   }

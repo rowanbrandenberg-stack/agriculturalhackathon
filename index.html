@@ -3,6 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#1f3d2b">
 <title>Spray or Wait</title>
 <link rel="stylesheet" href="style.css">
 </head>
@@ -141,7 +142,7 @@
     <div class="muted small">Paraphrased from University of Arizona Cooperative Extension and UC IPM. A reference for the conversation with your PCA, not a prescription. The PCA writes the recommendation and the label is the law.</div>
   </section>
 
-  <section class="card">
+  <section class="card" id="network">
     <div class="tlhead"><h2>Grower network</h2><div class="muted small" id="netState">Connecting…</div></div>
     <div class="net">
       <svg id="netMap" viewBox="0 0 240 240" role="img" aria-label="Reports near this block"></svg>
@@ -185,6 +186,7 @@
     Spray or Wait supports the applicator's decision. It does not replace the pesticide label, on site checks or regulations, and no system can guarantee zero drift. Wind limits of 3 to 10 mph are common guidance and every limit here can be set to match the label. Tower data in this demo is simulated.
   </footer>
 </main>
+<button id="fab" class="fab" type="button">Report from the field</button>
 <script src="engine.js"></script>
 <script src="sim.js"></script>
 <script src="pests.js"></script>

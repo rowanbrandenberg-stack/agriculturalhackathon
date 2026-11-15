@@ -128,3 +128,68 @@ footer{font-size:12px;color:var(--mut);padding:4px 6px;max-width:900px}
 .pk{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--mut);font-weight:700;padding-top:2px}
 .pr ul{margin:0;padding-left:18px}
 @media (max-width:1050px){.pest{grid-template-columns:1fr}.pr{grid-template-columns:1fr}}
+
+/* ---------- phone and tablet ---------- */
+html{-webkit-text-size-adjust:100%}
+main{grid-template-columns:minmax(0,1fr)}
+main>*,.hero>*,.grid3>*,.net>*,.pest>*,.scene>*,.form>*{min-width:0}
+svg{max-width:100%}
+#tl{touch-action:pan-y}
+button,select,input{touch-action:manipulation}
+@media (max-width:1050px){
+  .sceneSide{display:grid;grid-template-columns:210px 1fr;gap:6px 14px;align-items:center}
+  .sceneSide #compass{grid-row:1/3}
+  .sceneSide .legend{grid-column:2}
+  .sceneSide .mini{grid-column:2}
+  .sceneSide .blk{grid-column:1/-1;display:grid;grid-template-columns:210px 1fr;gap:14px;align-items:center;text-align:left}
+  .sceneSide .blkT{grid-column:1/-1}
+}
+@media (max-width:640px){
+  body{font-size:15px}
+  .top{padding:10px 14px;display:grid;grid-template-columns:1fr auto;gap:6px 10px}
+  .where{grid-column:1/-1;order:3;font-size:13px}
+  .brand .tag{display:none}
+  #clock{font-size:22px}
+  main{padding:10px;gap:12px}
+  .card{padding:14px 12px}
+  .status{padding:14px}
+  .light{width:56px;height:56px}
+  .word{font-size:44px}
+  .scene{padding:8px}
+  .sceneSide{grid-template-columns:1fr}
+  .sceneSide #compass{grid-row:auto;justify-self:center}
+  .sceneSide .legend,.sceneSide .mini{grid-column:1}
+  .sceneSide .legend{text-align:center}
+  .sceneSide .blk{grid-template-columns:1fr;justify-items:center}
+  .tlhead{align-items:flex-start}
+  .controls{width:100%}
+  .controls .jump{flex:1 1 100%;text-align:left;padding:10px 12px}
+  .jumpl{flex:1 1 100%;margin-left:0}
+  #play{flex:1;padding:10px}
+  #speed{flex:2}
+  #tl{height:290px}
+  .btn{padding:10px 14px;font-size:14px}
+  select,input[type=number],input[type=text]{padding:9px 10px;font-size:16px}
+  .row{flex-wrap:wrap}
+  .row input[type=number]{width:auto;flex:1}
+  .repform .row label{flex:1 1 45%}
+  #netMap{justify-self:center}
+  .fcgrid{grid-template-columns:30px repeat(24,1fr);gap:1px}
+  .fcgrid .c{height:22px}
+  .alertbar{padding:10px 12px;font-size:15px}
+  .alertbar .sub{font-size:13px}
+  th,td{padding:6px 7px;font-size:12px}
+  td:last-child{min-width:200px}
+  footer{font-size:11px}
+}
+select{max-width:100%}
+@media (max-width:640px){
+  .controls .chk{flex-wrap:wrap;max-width:100%}
+  #pestSel{width:100%}
+}
+
+.fab{display:none}
+@media (max-width:640px){
+  .fab{display:block;position:fixed;right:12px;bottom:14px;z-index:15;font:inherit;font-weight:700;font-size:14px;padding:12px 16px;border-radius:99px;border:0;background:var(--accent);color:#fff;box-shadow:0 6px 18px rgba(0,0,0,.3)}
+  main{padding-bottom:76px}
+}
