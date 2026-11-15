@@ -46,7 +46,10 @@
     <div class="jobstrip" id="jobStrip"></div>
     <div class="www">
       <div class="wcol"><h3 class="wh">What</h3>
-        <label class="wlab" for="whatSel">What you are spraying, from your PCA recommendation</label>
+        <div class="wpair"><div><label class="wlab" for="cropSel">Crop</label><select id="cropSel"></select></div>
+          <div><label class="wlab" for="pestPick">Pest found</label><select id="pestPick"></select></div></div>
+        <div id="chemBox" class="chems"></div>
+        <label class="wlab" for="whatSel">Spray type, from your PCA recommendation</label>
         <select id="whatSel"></select>
         <div id="whatNote" class="wtxt"></div>
       </div>
@@ -220,11 +223,19 @@
   </details>
 
   <details class="sec" id="pestSec">
-    <summary><b>Arizona citrus pest guide</b><span>Reference from University of Arizona Extension</span></summary>
+    <summary><b>Arizona crop and pest guide</b><span>Ten crops, reference from University of Arizona Extension</span></summary>
     <div class="secBody">
-      <div class="row"><label class="chk">What did scouting find <select id="pestSel"></select></label></div>
+      <div class="row"><label class="chk">What did scouting find <select id="pestSel"></select></label> <span class="muted small" id="pestCropTxt"></span></div>
       <div class="pest" id="pestBox"></div>
-      <div class="muted small">Paraphrased from University of Arizona Cooperative Extension and UC IPM. A reference for the conversation with your PCA, not a prescription. The PCA writes the recommendation and the label is the law.</div>
+      <div class="muted small">Paraphrased from University of Arizona Cooperative Extension, the UA Arizona Pest Management Center and UC IPM. A reference for the conversation with your PCA, not a prescription. The PCA writes the recommendation and the label is the law.</div>
+    </div>
+  </details>
+
+  <details class="sec" id="chemSec">
+    <summary><b>Chemical reference</b><span>Group, organic status and drift profile for each active ingredient</span></summary>
+    <div class="secBody">
+      <div class="tblwrap"><table class="chemT" id="chemT"></table></div>
+      <div class="muted small">Group is the resistance group code (IRAC for insecticides, FRAC for fungicides, HRAC for herbicides). Rotate groups. Selectivity is shown only where the University of Arizona has published a rating. This is a reference, not a recommendation. Rate, timing and whether a product is allowed on your crop come from the label and your PCA.</div>
     </div>
   </details>
 

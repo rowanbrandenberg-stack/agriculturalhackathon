@@ -115,5 +115,14 @@ t('no nearby inversion: stays GO', ev({}, { nearby: { inv: 0, of: 5, km: 5 } }).
 const nbS = ev({ tHi: 75 }, { nearby: { inv: 5, of: 5, km: 5 } });
 t('site inversion is still STOP and is not double counted', nbS.status === 'STOP' && !has(nbS, 'NEARBY_INVERSION'));
 
+console.log('Crop, pest and chemical reference');
+global.window = {}; require('../pests.js');
+const PP = window.SprayPests, CC = window.SprayCrops, KK = window.SprayChems;
+t('ten crops, 16 pests, 14 chemicals', CC.length === 10 && PP.length === 16 && KK.length === 14, [CC.length, PP.length, KK.length].join());
+t('every pest names a known crop and known chemicals', PP.every(p => p.crops.length && p.crops.every(c => CC.some(x => x.id === c)) && p.chems.every(c => KK.some(x => x.id === c))));
+t('every pest carries an Arizona or UC source link', PP.every(p => /^https:\/\/[^ ]*(arizona\.edu)/.test(p.src[1])), PP.filter(p => !/arizona\.edu/.test(p.src[1])).map(p => p.id).join());
+t('a crop with no pest entries says where to look instead', CC.filter(c => !PP.some(p => p.crops.indexOf(c.id) >= 0)).every(c => c.more && /^https:/.test(c.more[1])));
+t('every chemical maps to a weather profile the app has', KK.every(k => ['oil', 'sulfur', 'biofung', 'contact', 'volatile'].indexOf(k.profile) >= 0));
+
 console.log('\n' + pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);

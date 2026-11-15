@@ -129,6 +129,16 @@ async def main():
         live_ok['v'] = True
         await pg.evaluate("document.getElementById('modeSim').click()"); await pg.wait_for_timeout(500); s = await st()
         ck('back to demo day: 6:10 AM STOP with 30 ft labels', s['source']=='sim' and s['time']=='6:10 AM' and s['status']=='STOP' and 'Air at 30 ft' in await txt('#reasons') and await pg.is_visible('#scen'), s)
+        # crops, pests, chemicals
+        ck('ten crops, citrus first', await pg.evaluate("document.getElementById('cropSel').options.length")==10 and await pg.evaluate("document.getElementById('cropSel').value")=='citrus')
+        await pg.select_option('#cropSel','cotton'); await pg.select_option('#pestPick','lygus'); await pg.wait_for_timeout(200)
+        ck('cotton, Lygus: UA listed chemicals shown and the guide follows', 'Flonicamid' in await txt('#chemBox') and 'number one insect pest' in await pg.evaluate("document.getElementById('pestBox').textContent"))
+        await pg.evaluate("document.querySelector('#chemBox button[data-chem=flonicamid]').click()"); await pg.wait_for_timeout(300)
+        ck('tapping a chemical sets the spray type', await pg.evaluate("document.getElementById('whatSel').value")=='contact')
+        await pg.select_option('#cropSel','wheat'); await pg.wait_for_timeout(200)
+        ck('a crop with no entries says so and links to UA', 'No University of Arizona sourced entries' in await txt('#chemBox'))
+        ck('chemical table lists 14 rows with aggregated use', await pg.evaluate("document.querySelectorAll('#chemT tbody tr').length")==14 and '2 pests on citrus' in await pg.evaluate("document.getElementById('chemT').textContent"), await pg.evaluate("document.getElementById('chemT').textContent"))
+        await pg.select_option('#cropSel','citrus'); await pg.select_option('#whatSel','custom'); await pg.wait_for_timeout(200)
         # what, when, how
         await pg.click('.jump[data-min="660"]'); await pg.wait_for_timeout(200)
         ck('what when how band is on the main screen', await pg.is_visible('#whatSel') and 'Now.' in await txt('#whenBox') and 'coarsest droplets' in await txt('#howBox'), await txt('#whenBox'))
@@ -163,7 +173,7 @@ async def main():
         m.on('pageerror', lambda e: merr.append(str(e)))
         await m.goto(URL); await m.wait_for_timeout(1200)
         ck('mobile: no sideways scroll', await m.evaluate('document.documentElement.scrollWidth') <= 390)
-        for d in ['rulesSec','recordSec','fileSec','nbrSec','netSec','pestSec','waitSec']: await m.evaluate(f"document.getElementById('{d}').open=true")
+        for d in ['rulesSec','recordSec','fileSec','nbrSec','netSec','pestSec','chemSec','waitSec']: await m.evaluate(f"document.getElementById('{d}').open=true")
         await m.wait_for_timeout(300)
         ck('mobile: no sideways scroll with every section open', await m.evaluate('document.documentElement.scrollWidth') <= 390, await m.evaluate('document.documentElement.scrollWidth'))
         clipped = await m.evaluate("[...document.querySelectorAll('button,select,input,.pill')].filter(e=>{const r=e.getBoundingClientRect();return r.width>0 && (r.right>391||r.left<-1) && !e.closest('.logwrap')}).map(e=>e.id||e.className).slice(0,8)")

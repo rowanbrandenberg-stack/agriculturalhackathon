@@ -1,4 +1,4 @@
-/* Spray or Wait: Arizona citrus pest guide.
+/* Spray or Wait: Arizona crop, pest and chemical reference.
    Every entry is paraphrased from University of Arizona Cooperative Extension or UC IPM publications (links on each entry).
    This is a reference for the conversation with a PCA. It is not a prescription: the PCA writes the recommendation and the label is the law. */
 window.SprayPests = [
@@ -36,5 +36,117 @@ window.SprayPests = [
     scout: 'Look for white fluted egg sacs (scale) or waxy filaments and sooty mold (whitefly).',
     options: ['Chemical treatment is rarely needed for cottony cushion scale in Arizona', 'If you must treat, timing to first instars works best, often with narrow range oil added'],
     defend: 'Vedalia beetle controls cottony cushion scale and the Eretmocerus wasp is very effective on woolly whitefly. Using selective products for thrips keeps these helpers alive.',
-    src: ['UA Extension, Citrus Arthropod Pest Management in Arizona (cottony cushion scale)', 'https://ag.arizona.edu/crop/citrus/insects/cottonycushion.pdf'] }
+    src: ['UA Extension, Citrus Arthropod Pest Management in Arizona (cottony cushion scale)', 'https://ag.arizona.edu/crop/citrus/insects/cottonycushion.pdf'] },
+
+  /* ---- cotton ---- */
+  { id: 'cwf', crops: ['cotton'], name: 'Sweetpotato (silverleaf) whitefly', profile: 'contact', chems: ['pyriproxyfen', 'buprofezin'],
+    why: 'One of the two key pests left in Arizona cotton. Honeydew makes lint sticky.',
+    when: 'Builds through summer. It moves between cotton, melons and vegetables, so neighbors matter.',
+    scout: 'University of Arizona sampling counts adults on leaves and large nymphs on leaf disks. Ask your PCA for the current threshold.',
+    options: ['Whitefly insect growth regulators: pyriproxyfen (Knack) and buprofezin (Courier). UA rates both fully selective in cotton.', 'Rotate modes of action across crops. Whitefly resistance is managed area wide in Arizona.'],
+    defend: 'Selective products leave the predators alive, and those predators keep whiteflies down for the rest of the season.',
+    src: ['UA Arizona Pest Management Center, selective and effective cotton chemistry', 'https://acis.cals.arizona.edu/docs/default-source/ipm-shorts/18selective-effective-cotton-chemistry10-7-19.pdf'] },
+  { id: 'lygus', crops: ['cotton'], name: 'Lygus bug', profile: 'contact', chems: ['flonicamid', 'sulfoxaflor'],
+    why: 'UA calls Lygus the number one insect pest of Arizona cotton since the late 1990s. It feeds on squares and small bolls.',
+    when: 'Summer. Lygus is very mobile and moves in from alfalfa and other crops.',
+    scout: 'Sweep net counts. Ask your PCA for the UA threshold.',
+    options: ['Flonicamid (Carbine) and sulfoxaflor (Transform). UA describes both as safe for the predators that hold whiteflies down.'],
+    defend: 'Avoiding broad spectrum sprays for Lygus protects the natural enemies that control whitefly.',
+    src: ['UA Arizona Pest Management Center, selective and effective cotton chemistry', 'https://acis.cals.arizona.edu/docs/default-source/ipm-shorts/18selective-effective-cotton-chemistry10-7-19.pdf'] },
+
+  /* ---- desert vegetables and melons ---- */
+  { id: 'worms', crops: ['lettuce', 'spinach', 'broccoli', 'cauliflower'], name: 'Worms: beet armyworm, cabbage looper, corn earworm', profile: 'contact', chems: ['spinetoram', 'spinosad', 'bt'],
+    why: 'Larvae eat seedlings and contaminate heads. The worm complex is among the most costly insect problems in desert lettuce.',
+    when: 'Pressure is highest on fall plantings.',
+    scout: 'Check plants for eggs, small larvae and fresh feeding from stand establishment on. Ask your PCA for the threshold at your crop stage.',
+    options: ['Spinetoram (Radiant)', 'Organic: spinosad (Entrust) and Bt products', 'Rotate modes of action. UA publishes resistance guidelines for beet armyworm in lettuce.'],
+    defend: 'Keep lettuce away from corn and alfalfa where you can. Those crops carry armyworm, whitefly and thrips through summer.',
+    src: ['UA Arizona Pest Management Center, lettuce insects', 'https://acis.cals.arizona.edu/agricultural-ipm/vegetables/lettuce/insects'] },
+  { id: 'wft', crops: ['lettuce', 'spinach'], name: 'Western flower thrips', profile: 'contact', chems: ['spinetoram', 'spinosad'],
+    why: 'Feeding scars leaves, and thrips are a contaminant at harvest.',
+    when: 'Builds in the cooler months and into spring.',
+    scout: 'Beat plants over a tray or check inside leaves. Ask your PCA for the threshold.',
+    options: ['Spinetoram (Radiant)', 'Organic: spinosad (Entrust)'],
+    defend: 'Control weeds in and around the field. Do not plant next to crops that carry thrips through summer.',
+    src: ['UA Arizona Pest Management Center, lettuce insects', 'https://acis.cals.arizona.edu/agricultural-ipm/vegetables/lettuce/insects'] },
+  { id: 'vaphid', crops: ['lettuce', 'spinach', 'broccoli', 'cauliflower'], name: 'Aphids: green peach aphid, lettuce aphid', profile: 'contact', chems: ['soap', 'aza'],
+    why: 'Aphids inside heads and leaves cut yield and quality. In many lettuce areas they are the most costly insect pest.',
+    when: 'Cool season, peaking in spring.',
+    scout: 'Check field edges first, then inner leaves. Ask your PCA for the threshold.',
+    options: ['Organic: in UA Yuma trials (2024 to 2025) insecticidal soap (M-Pede) and azadirachtin (Aza-Direct) gave measurable control, with soap best in lettuce', 'Conventional: your PCA picks from several selective aphid products'],
+    defend: 'Winged aphids move in from weeds and other crops, so keep field edges clean.',
+    src: ['UA field trial report, organic allowed insecticide options for Arizona vegetables (2025)', 'https://repository.arizona.edu/handle/10150/678051'] },
+  { id: 'vwf', crops: ['lettuce', 'broccoli', 'cauliflower', 'melons'], name: 'Sweetpotato whitefly in vegetables and melons', profile: 'contact', chems: ['soap', 'aza'],
+    why: 'Feeding weakens young plants. In melons the whitefly also spreads a yellowing virus (CYSDV).',
+    when: 'Fall plantings and spring melons.',
+    scout: 'Count adults on leaves. UA gives an action threshold for foliar sprays in leafy vegetables (AZ2116).',
+    options: ['Prevention: a soil systemic insecticide at planting, by tray drench or through drip (UA AZ2116)', 'Organic: soap (M-Pede) and azadirachtin (Aza-Direct) gave measurable whitefly control in UA Yuma trials'],
+    defend: 'Whitefly moves between cotton, melons and vegetables. Arizona growers share one resistance plan across those crops.',
+    src: ['UA Extension AZ2116, insect management in leafy vegetables', 'https://www.extension.arizona.edu/sites/default/files/2025-03/az2116-2025.pdf'] },
+  { id: 'dbm', crops: ['broccoli', 'cauliflower'], name: 'Diamondback moth', profile: 'contact', chems: ['bt', 'spinosad'],
+    why: 'Larvae feed on leaves and contaminate heads of broccoli and cauliflower.',
+    when: 'Can arrive on transplants. Watch from planting on.',
+    scout: 'Look for small green larvae that wriggle when touched, and window pane feeding on leaves.',
+    options: ['Organic options were tested in UA Yuma trials in 2024 and 2025. See the report for results.', 'Rotate modes of action. This pest is known for resistance.'],
+    defend: 'Start with clean transplants and destroy crop residue soon after harvest.',
+    src: ['UA field trial report, organic allowed insecticide options for Arizona vegetables (2025)', 'https://repository.arizona.edu/handle/10150/678051'] },
+  { id: 'flea', crops: ['broccoli', 'cauliflower', 'lettuce', 'spinach'], name: 'Palestriped flea beetle', profile: 'custom', chems: [],
+    why: 'Adults chew small holes in seedling leaves and can thin a stand.',
+    when: 'Stand establishment in fall plantings.',
+    scout: 'Check seedlings and field edges at emergence.',
+    options: ['UA lists this among six major pests tested in its 2024 to 2025 organic trials. Product choice is for your PCA.'],
+    defend: 'Seedlings outgrow light damage. The stand establishment window is the one that matters.',
+    src: ['UA Extension AZ2116, insect management in leafy vegetables', 'https://www.extension.arizona.edu/sites/default/files/2025-03/az2116-2025.pdf'] },
+
+  /* ---- alfalfa ---- */
+  { id: 'aweevil', crops: ['alfalfa'], name: 'Alfalfa weevil', profile: 'contact', chems: [],
+    why: 'UA calls it the major yield reducing insect pest of alfalfa in Arizona.',
+    when: 'Winter and spring.',
+    scout: 'Sweep net with 180 degree sweeps. UA thresholds are based on that method, so other sweep styles give different counts.',
+    options: ['UA lists the insecticides registered for alfalfa weevil in Arizona. Product choice is for your PCA.', 'Check the pre harvest interval. Cutting early is sometimes the alternative to spraying.'],
+    defend: 'Natural enemies matter in alfalfa. Selective products keep them working.',
+    src: ['UA Extension, Insect Threats to Alfalfa', 'https://extension.arizona.edu/publication/insect-threats-alfalfa'] },
+  { id: 'aaphid', crops: ['alfalfa'], name: 'Alfalfa aphids: blue alfalfa, pea, spotted, cowpea', profile: 'contact', chems: [],
+    why: 'Heavy numbers stunt growth and cut hay yield and quality.',
+    when: 'Mostly winter and spring.',
+    scout: 'Count aphids per stem and note which species. Thresholds differ by species and plant height.',
+    options: ['Resistant varieties and biological control come first in the UA guide. Sprays are for counts over threshold.'],
+    defend: 'Lady beetles and parasitic wasps often hold aphids below threshold.',
+    src: ['UA Extension AZ1044, aphids in alfalfa', 'https://extension.arizona.edu/sites/extension.arizona.edu/files/pubs/az1044.pdf'] },
+  { id: 'cutworm', crops: ['alfalfa'], name: 'Cutworms: granulate and variegated', profile: 'contact', chems: [],
+    why: 'Frequent pests in the low desert. They feed at night and hide under debris by day.',
+    when: 'Seedling stands and regrowth after cutting.',
+    scout: 'Look under windrows and soil clods near damaged plants.',
+    options: ['Product choice is for your PCA.'],
+    defend: 'Removing hay from the field promptly takes away their cover.',
+    src: ['UA Extension, Insect Threats to Alfalfa', 'https://extension.arizona.edu/publication/insect-threats-alfalfa'] }
+];
+window.SprayPests.forEach(function (p) { if (!p.crops) p.crops = ['citrus']; if (!p.chems) p.chems = { thrips: ['flonicamid', 'cyantraniliprole', 'spinetoram', 'abamectin'], mites: ['sulfur', 'abamectin', 'oil'], redscale: ['pyriproxyfen', 'oil'], cottony: ['oil'] }[p.id] || []; });
+
+/* Ten major Arizona crops (USDA NASS state statistics). more: where to look when this database has no entry yet. */
+window.SprayCrops = [
+  { id: 'citrus', name: 'Citrus (lemons)' }, { id: 'lettuce', name: 'Lettuce' }, { id: 'alfalfa', name: 'Alfalfa hay' }, { id: 'cotton', name: 'Cotton' },
+  { id: 'broccoli', name: 'Broccoli' }, { id: 'cauliflower', name: 'Cauliflower' }, { id: 'spinach', name: 'Spinach' }, { id: 'melons', name: 'Melons' },
+  { id: 'wheat', name: 'Wheat', more: ['UA field crop IPM publications', 'https://acis.cals.arizona.edu/agricultural-ipm/field-crop/outputs/publications'] },
+  { id: 'dates', name: 'Dates', more: ['UA Cooperative Extension publications', 'https://extension.arizona.edu/publication-categories/publication'] }
+];
+
+/* Chemical reference. group: resistance group code (IRAC insecticides, FRAC fungicides, HRAC herbicides).
+   profile: which Spray or Wait weather profile applies. sel: only filled where UA has published a selectivity rating. */
+window.SprayChems = [
+  { id: 'spinosad', name: 'Spinosad', brand: 'Entrust', group: 'IRAC 5', organic: true, profile: 'contact', sel: '' },
+  { id: 'spinetoram', name: 'Spinetoram', brand: 'Radiant, Delegate', group: 'IRAC 5', organic: false, profile: 'contact', sel: '' },
+  { id: 'bt', name: 'Bt (Bacillus thuringiensis)', brand: 'several', group: 'IRAC 11A', organic: true, profile: 'contact', sel: '' },
+  { id: 'soap', name: 'Insecticidal soap', brand: 'M-Pede', group: 'not classified', organic: true, profile: 'contact', sel: '' },
+  { id: 'aza', name: 'Azadirachtin (neem extract)', brand: 'Aza-Direct', group: 'IRAC UN', organic: true, profile: 'contact', sel: '' },
+  { id: 'oil', name: 'Horticultural or neem oil', brand: 'several', group: 'not classified', organic: true, profile: 'oil', sel: '' },
+  { id: 'sulfur', name: 'Sulfur', brand: 'several', group: 'FRAC M02', organic: true, profile: 'sulfur', sel: '' },
+  { id: 'pyriproxyfen', name: 'Pyriproxyfen', brand: 'Knack, Esteem', group: 'IRAC 7C', organic: false, profile: 'contact', sel: 'Fully selective in cotton (UA)' },
+  { id: 'buprofezin', name: 'Buprofezin', brand: 'Courier', group: 'IRAC 16', organic: false, profile: 'contact', sel: 'Fully selective in cotton (UA)' },
+  { id: 'flonicamid', name: 'Flonicamid', brand: 'Carbine, Beleaf', group: 'IRAC 29', organic: false, profile: 'contact', sel: 'Fully selective in cotton (UA)' },
+  { id: 'sulfoxaflor', name: 'Sulfoxaflor', brand: 'Transform', group: 'IRAC 4C', organic: false, profile: 'contact', sel: 'Safe for predators in cotton (UA)' },
+  { id: 'cyantraniliprole', name: 'Cyantraniliprole', brand: 'Exirel', group: 'IRAC 28', organic: false, profile: 'contact', sel: 'Fully selective in cotton (UA)' },
+  { id: 'abamectin', name: 'Abamectin', brand: 'Agri-Mek', group: 'IRAC 6', organic: false, profile: 'contact', sel: '' },
+  { id: 'auxin', name: 'Auxin herbicides: 2,4-D, dicamba', brand: 'several', group: 'HRAC 4', organic: false, profile: 'volatile', sel: '',
+    note: 'Highest drift concern in this list. UA warns that tomatoes, melons and grapes are very sensitive to these herbicides.', src: 'https://cales.arizona.edu/crop/cotton/files/auxin.pdf' }
 ];

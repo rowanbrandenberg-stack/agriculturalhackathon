@@ -96,11 +96,21 @@ If any of the five points shows an inversion while the site estimate does not, t
 Kriging is not implemented. It needs enough real stations to fit a variogram for the area, and this prototype has model points only. With a network of towers, kriging would replace IDW in one function (`idwReading`) and would also give an uncertainty for each estimate.
 
 
+## Crop, pest and chemical reference
+
+The What box now starts with two pickers: **Crop** (ten major Arizona crops) and **Pest found**. It then shows the active ingredients University of Arizona Extension lists for that pest. Tapping one sets the spray type, which sets the heat and vapor checks.
+
+- 10 crops: citrus, lettuce, alfalfa hay, cotton, broccoli, cauliflower, spinach, melons, wheat, dates. Wheat and dates have no sourced pest entries yet and say so, with a link to UA publications.
+- 16 pests, each paraphrased from a University of Arizona source that is linked on the entry.
+- 14 active ingredients in the Chemical reference table: resistance group, organic status, UA selectivity rating where one is published, the weather profile this tool applies, and every pest and crop in the database that lists it.
+
+This is a reference for the conversation with a PCA, not a prescription. All data is in `pests.js`.
+
 ## Tests
 
 ```
 node tests/engine.test.js      # 64 decision logic checks, no dependencies
-python3 tests/flows.py [url]   # 61 user flow checks in a headless browser (needs Playwright and Chrome)
+python3 tests/flows.py [url]   # 66 user flow checks in a headless browser (needs Playwright and Chrome)
 ```
 
 ## Files

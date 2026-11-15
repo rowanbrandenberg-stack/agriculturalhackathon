@@ -3,7 +3,7 @@
   const E = window.SprayEngine, S = window.SpraySim;
   const $ = id => document.getElementById(id);
   const f1 = E.f1;
-  const BUILD = '2026-11-15.12';
+  const BUILD = '2026-11-15.13';
   /* Live mode: a real location, real model weather. Rounded coordinates for the area, not the farm's address. No tower is installed there. */
   const FARM = { name: 'SouthWinds Farm area', place: 'near Benson, Arizona', lat: 31.97, lon: -110.29 };
   const BLOCK_SIM = 'Block 7, lemons, Yuma County, Arizona';
@@ -686,14 +686,44 @@
   }
 
   /* ---------- pest guide ---------- */
+  /* ---------- crop, pest and chemical reference ---------- */
+  const PESTS = window.SprayPests, CROPS = window.SprayCrops, CHEMS = window.SprayChems;
+  const chemById = id => CHEMS.find(c => c.id === id);
+  const cropPests = () => PESTS.filter(p => p.crops.indexOf($('cropSel').value) >= 0);
+  function setCrop() {
+    const list = cropPests(), opts = list.map(p => '<option value="' + p.id + '">' + esc(p.name) + '</option>').join('');
+    $('pestPick').innerHTML = '<option value="">' + (list.length ? 'Not sure yet' : 'No entries yet') + '</option>' + opts;
+    $('pestSel').innerHTML = opts || '<option value="">No entries yet</option>';
+    $('pestCropTxt').textContent = 'Crop: ' + CROPS.find(c => c.id === $('cropSel').value).name + '. Change the crop in the What box at the top.';
+    try { localStorage.setItem('sow_crop', $('cropSel').value); } catch (e) {}
+    renderPest(); renderChemBox();
+  }
+  function useChem(c) { $('cfgProf').value = c.profile; if (readForm()) $('chemBox').querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.chem === c.id)); }
+  function renderChemBox() {
+    const p = PESTS.find(x => x.id === $('pestPick').value), box = $('chemBox'), crop = CROPS.find(c => c.id === $('cropSel').value);
+    if (!p) { box.innerHTML = cropPests().length ? '' : '<span class="muted small">No University of Arizona sourced entries for ' + esc(crop.name.toLowerCase()) + ' in this database yet. Ask your PCA, or see <a href="' + crop.more[1] + '" target="_blank" rel="noopener">' + esc(crop.more[0]) + '</a>.</span>'; return; }
+    const cs = p.chems.map(chemById);
+    box.innerHTML = (cs.length ? '<div class="muted small">Listed by UA Extension for this pest. Tap the one on your PCA recommendation:</div>' + cs.map(c => '<button type="button" class="chem" data-chem="' + c.id + '">' + esc(c.name) + (c.organic ? ' <i>organic</i>' : '') + '</button>').join('')
+      : '<span class="muted small">Product choice for this pest is for your PCA.</span>') + ' <a href="#pestSec" class="lnk" data-open="pestSec">Scouting and source</a>';
+    box.querySelectorAll('button').forEach(b => { b.onclick = () => useChem(chemById(b.dataset.chem)); });
+  }
   function renderPest() {
-    const p = window.SprayPests.find(x => x.id === $('pestSel').value) || window.SprayPests[0];
+    const p = PESTS.find(x => x.id === $('pestSel').value);
+    if (!p) { const crop = CROPS.find(c => c.id === $('cropSel').value); $('pestBox').innerHTML = '<div>No University of Arizona sourced entries for ' + esc(crop.name.toLowerCase()) + ' in this database yet.' + (crop.more ? ' See <a href="' + crop.more[1] + '" target="_blank" rel="noopener">' + esc(crop.more[0]) + '</a>.' : '') + '</div>'; return; }
     const row = (t, v) => '<div class="pr"><div class="pk">' + t + '</div><div>' + v + '</div></div>';
     $('pestBox').innerHTML = '<div>' + row('Why it matters', esc(p.why)) + row('When', esc(p.when)) + row('Scout first', esc(p.scout)) + '</div><div>' +
-      row('Options Extension lists', '<ul>' + p.options.map(o => '<li>' + esc(o) + '</li>').join('') + '</ul>') + row('Help the grove defend itself', esc(p.defend)) +
+      row('Options Extension lists', '<ul>' + p.options.map(o => '<li>' + esc(o) + '</li>').join('') + '</ul>') + row('Help the crop defend itself', esc(p.defend)) +
       row('Source', '<a href="' + p.src[1] + '" target="_blank" rel="noopener">' + esc(p.src[0]) + '</a>') +
       (p.profile !== 'custom' ? '<div class="row"><button id="pestUse" class="btn">Use the ' + PROFILES[p.profile].name.toLowerCase() + ' spray profile</button></div>' : '') + '</div>';
     const b = $('pestUse'); if (b) b.onclick = () => { $('cfgProf').value = p.profile; readForm(); };
+  }
+  function renderChemTable() {   // aggregate: every pest and crop in the database that lists each chemical
+    const cropName = id => CROPS.find(c => c.id === id).name.toLowerCase();
+    $('chemT').innerHTML = '<thead><tr><th>Active ingredient</th><th>Group</th><th>Organic</th><th>Selectivity (UA)</th><th>Weather profile here</th><th>Listed in this database for</th></tr></thead><tbody>' +
+      CHEMS.map(c => { const use = PESTS.filter(p => p.chems.indexOf(c.id) >= 0);
+        const crops = Array.from(new Set([].concat.apply([], use.map(p => p.crops)))).map(cropName);
+        return '<tr><td><b>' + esc(c.name) + '</b><div class="muted small">' + esc(c.brand) + '</div></td><td>' + esc(c.group) + '</td><td>' + (c.organic ? 'Organic formulations exist' : 'No') + '</td><td>' + esc(c.sel || 'Not rated here') + '</td><td>' + esc(PROFILES[c.profile].name) + '</td><td>' +
+          (use.length ? use.length + (use.length > 1 ? ' pests' : ' pest') + ' on ' + esc(crops.join(', ')) + '<div class="muted small">' + esc(use.map(p => p.name.split(':')[0]).join('; ')) + '</div>' : (c.note ? esc(c.note) + ' <a href="' + c.src + '" target="_blank" rel="noopener">UA source</a>' : 'None yet')) + '</td></tr>'; }).join('') + '</tbody>';
   }
 
   /* ---------- waitlist and QR ---------- */
@@ -805,7 +835,12 @@
     document.querySelectorAll('.qbtn').forEach(b => b.onclick = async () => { b.disabled = true; const ok = await postReport(b.dataset.kind, null); b.disabled = false;
       $('quickMsg').textContent = ok ? 'Sent to the shared database.' : 'Could not reach the shared database. Kept on this device only.'; });
     ['lat', 'lon'].forEach(id => $(id).addEventListener('change', () => applyNetwork(false)));
-    $('pestSel').innerHTML = window.SprayPests.map(p => '<option value="' + p.id + '">' + esc(p.name) + '</option>').join(''); $('pestSel').onchange = renderPest; renderPest();
+    $('cropSel').innerHTML = CROPS.map(c => '<option value="' + c.id + '">' + esc(c.name) + '</option>').join('');
+    try { const sc = localStorage.getItem('sow_crop'); if (sc && CROPS.find(c => c.id === sc)) $('cropSel').value = sc; } catch (e) {}
+    $('cropSel').onchange = setCrop;
+    $('pestPick').onchange = () => { if ($('pestPick').value) { $('pestSel').value = $('pestPick').value; renderPest(); } renderChemBox(); };
+    $('pestSel').onchange = () => { $('pestPick').value = $('pestSel').value; renderPest(); renderChemBox(); };
+    setCrop(); renderChemTable();
     $('wlBtn').onclick = joinWaitlist; renderQr();
     renderNetwork(); pullNetwork(false); setInterval(() => pullNetwork(true), 8000);
     window.__sow = { state: () => ({ idx: idx, time: fmtTime(series[idx].min), status: evals[idx].status, ground: evals[idx].ground.status, logLen: log.length, playing: playing, source: source.kind, n: series.length, step: stepMin }) };
