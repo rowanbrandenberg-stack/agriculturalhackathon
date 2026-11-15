@@ -3,7 +3,7 @@
   const E = window.SprayEngine, S = window.SpraySim;
   const $ = id => document.getElementById(id);
   const f1 = E.f1;
-  const BUILD = '2026-11-15.17';
+  const BUILD = '2026-11-15.18';
   /* Live mode: a real location, real model weather. Rounded coordinates for the area, not the farm's address. No tower is installed there. */
   const FARM = { name: 'SouthWinds Farm area', place: 'near Benson, Arizona', lat: 31.97, lon: -110.29 };
   const BLOCK_SIM = 'Block 7, lemons, Yuma County, Arizona';
@@ -647,7 +647,7 @@
     h += '<rect x="' + (Sz / 2 - 9) + '" y="' + (Sz / 2 - 9) + '" width="18" height="18" rx="4" fill="#15212a" stroke="#fff" stroke-width="2"/><text x="' + Sz / 2 + '" y="' + (Sz / 2 + 24) + '" text-anchor="middle" font-size="10" font-weight="600" fill="#15212a">This block</text>';
     h += '<text x="' + Sz / 2 + '" y="14" text-anchor="middle" font-size="11" font-weight="600" fill="#17201b">N</text></g>';
     $('heatMap').innerHTML = h;
-    $('heatState').innerHTML = '<span class="srcTag light">Sample community reports</span> drawn as shading so the map is not empty. <span class="srcTag light">Actual community reports</span> ' + real.length + ' nearby, drawn as solid dots. ' + (netOnline === false ? '<b>Community feed unavailable.</b> This is not the same as zero reports. ' : '') + (isLive() ? 'Actual reports count as site concerns for this location. They never change the weather result.' : '<b>Demo mode: actual reports are shown here but never change the demo decision, and nothing you tap is sent.</b>');
+    $('heatState').innerHTML = '<span class="srcTag light">Sample community reports</span> shown as shading. <span class="srcTag light">Actual community reports</span> ' + real.length + ' nearby, shown as dots. ' + (netOnline === false ? '<b>Community feed unavailable.</b> That is not the same as zero reports. ' : '') + (isLive() ? 'Actual reports count as site concerns here. They never change the weather result.' : 'In the demo they never change the decision.');
     const using = new Set(evals[idx].triggers.filter(t => /^NET_/.test(t.code)).map(t => ({ NET_INVERSION: 'inversion', NET_DRIFT: 'drift', NET_CREW: 'crew' }[t.code])));
     $('netFeed').innerHTML = community.slice(0, 10).map(c => '<li><span class="dot" style="background:' + KIND[c.kind][1] + '"></span><div><b>' + KIND[c.kind][0] + '</b> ' + (c.distMi < 0.15 ? 'at this block' : f1(c.distMi) + ' mi ' + E.compass(c.bearing)) + ', ' + (c.ageMin < 1 ? 'just now' : c.ageMin < 60 ? Math.round(c.ageMin) + ' min ago' : f1(c.ageMin / 60) + ' h ago') + (c.local ? ' (this device only)' : '') + (using.has(c.kind) ? ' <span class="used">affecting the call</span>' : '') + '</div></li>').join('') || '<li class="muted">No actual reports within 5 miles in the last 8 hours.</li>';
   }
