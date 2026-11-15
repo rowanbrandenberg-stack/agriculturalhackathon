@@ -3,7 +3,10 @@
   const E = window.SprayEngine, S = window.SpraySim;
   const $ = id => document.getElementById(id);
   const f1 = E.f1;
-  const BUILD = '2026-11-15.10';
+  const BUILD = '2026-11-15.11';
+  /* Live mode: a real location, real model weather. Rounded coordinates for the area, not the farm's address. No tower is installed there. */
+  const FARM = { name: 'SouthWinds Farm area', place: 'near Benson, Arizona', lat: 31.97, lon: -110.29 };
+  const BLOCK_SIM = 'Block 7, lemons, Yuma County, Arizona';
   const LIVE_URL = 'https://rowanbrandenberg-stack.github.io/agriculturalhackathon/';
   const TZ = { name: 'America/Phoenix', offset: '-07:00', abbr: 'MST' };
   const WATCH_HOURS = { low: 1, medium: 4, high: 12 };   // prototype values, confirm with a PCA
@@ -60,27 +63,36 @@
   const jobWords = () => (cfg.jobHours === 1 ? '1 hour' : cfg.jobHours + ' hour');
   const p2 = n => String(n).padStart(2, '0');
   const dateStr = () => today.getFullYear() + '-' + p2(today.getMonth() + 1) + '-' + p2(today.getDate());
-  const measIso = min => dateStr() + 'T' + p2(Math.floor(min / 60)) + ':' + p2(min % 60) + ':00' + TZ.offset;
+  const dayDate = min => { const d = new Date(today.getFullYear(), today.getMonth(), today.getDate() + Math.floor(min / 1440)); return d.getFullYear() + '-' + p2(d.getMonth() + 1) + '-' + p2(d.getDate()); };
+  const measIso = min => dayDate(min) + 'T' + p2(Math.floor((min % 1440) / 60)) + ':' + p2(min % 60) + ':00' + TZ.offset;
+  const tm = min => fmtTime(min) + (min >= 1440 ? ' tomorrow' : '');
   function esc(s) { return String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
   function saveCfg() { try { const o = {}; CFG_KEYS.forEach(k => o[k] = cfg[k]); localStorage.setItem('sow_cfg', JSON.stringify(o)); } catch (e) {} }
-  const sourceName = () => source.kind === 'sim' ? 'Simulated tower readings' : 'Imported tower readings';
+  const sourceName = () => source.kind === 'sim' ? 'Simulated tower readings' : source.kind === 'live' ? 'Live regional model' : 'Imported tower readings';
+  const isLive = () => source.kind === 'live';
   const reading = i => { const r = Object.assign({}, series[i].r); if (dropHi) { r.tHi = null; r.wHi = null; r.dHi = null; } return r; };
+  /* What the rules see. In live model mode the upper wind is at 260 ft, far above any canopy, so the shear and upper wind rules
+     are not applied: the upper wind is replaced by the ground wind and only the temperature pair and ground wind are judged. */
+  const evalReading = i => { const r = reading(i); if (isLive()) { r.wHi = r.wLo; r.dHi = r.dLo; } return r; };
   const metaOf = i => ({ ageMin: series[i].ageMin, staleMin: cfg.staleIntervals * stepMin });
-  function recompute() { evals = series.map((s, i) => E.evaluate(reading(i), cfg, metaOf(i))); overIdx = null; }
+  function recompute() { evals = series.map((s, i) => E.evaluate(evalReading(i), cfg, metaOf(i))); overIdx = null; }
   /* Community reports are about right now, so they adjust only the current reading, never the day totals. */
   function setNow() {
-    if (overIdx != null && overIdx !== idx && overIdx < series.length) evals[overIdx] = E.evaluate(reading(overIdx), cfg, metaOf(overIdx));
-    evals[idx] = E.evaluate(reading(idx), Object.assign({}, cfg, { community: community }), metaOf(idx)); overIdx = idx;
+    if (overIdx != null && overIdx !== idx && overIdx < series.length) evals[overIdx] = E.evaluate(evalReading(overIdx), cfg, metaOf(overIdx));
+    evals[idx] = E.evaluate(evalReading(idx), Object.assign({}, cfg, { community: community }), metaOf(idx)); overIdx = idx;
   }
-  const baseEvals = () => evals.map((e, i) => i === overIdx ? E.evaluate(reading(i), cfg, metaOf(i)) : e);
+  const baseEvals = () => evals.map((e, i) => i === overIdx ? E.evaluate(evalReading(i), cfg, metaOf(i)) : e);
   function download(name, text, type) { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], { type: type || 'text/csv' })); a.download = name; document.body.appendChild(a); a.click(); a.remove(); }
 
   /* ---------- current weather ---------- */
   function goodReasons(r, ev) {
     const lo = cfg.loLabel, hi = cfg.hiLabel, out = [];
     out.push(['No inversion detected between ' + lo + ' and ' + hi, 'The ' + hi + ' reading is ' + f1(-ev.dT) + '°F cooler than the ' + lo + ' reading.']);
-    out.push(['Wind inside your limits at both heights', f1(r.wLo) + ' mph at ' + lo + ' and ' + f1(r.wHi) + ' mph at ' + hi + '. Limits are ' + cfg.windMin + ' to ' + cfg.windMax + ' mph.']);
-    out.push(['Wind similar at both heights', 'From the ' + E.compass(r.dLo) + ' at ' + lo + ' and the ' + E.compass(r.dHi) + ' at ' + hi + ', ' + Math.round(ev.shearDir) + '° apart. Speeds differ by ' + f1(Math.abs(ev.shearSpd)) + ' mph.']);
+    if (isLive()) out.push(['Ground wind inside your limits', f1(r.wLo) + ' mph from the ' + E.compass(r.dLo) + ' in the model at 10 m. Limits are ' + cfg.windMin + ' to ' + cfg.windMax + ' mph. Wind shear is not judged without a tower.']);
+    else {
+      out.push(['Wind inside your limits at both heights', f1(r.wLo) + ' mph at ' + lo + ' and ' + f1(r.wHi) + ' mph at ' + hi + '. Limits are ' + cfg.windMin + ' to ' + cfg.windMax + ' mph.']);
+      out.push(['Wind similar at both heights', 'From the ' + E.compass(r.dLo) + ' at ' + lo + ' and the ' + E.compass(r.dHi) + ' at ' + hi + ', ' + Math.round(ev.shearDir) + '° apart. Speeds differ by ' + f1(Math.abs(ev.shearSpd)) + ' mph.']);
+    }
     if (cfg.siteOn) out.push(['Measured winds point away from the ' + cfg.siteName, 'This does not establish where all droplets or vapor will travel.']);
     return out;
   }
@@ -88,7 +100,7 @@
     const r = reading(idx), ev = evals[idx];
     $('statusCard').className = 'status ' + ev.status;
     $('statusWord').textContent = ev.status;
-    let action = { GO: 'Measured weather checks passed. Confirm label requirements and on site conditions before applying.', CAUTION: 'Marginal. Read the reasons and recheck before each tank.', STOP: 'Do not spray right now.', UNABLE: 'Unable to assess. This is not a GO.' }[ev.status];
+    let action = { GO: (isLive() ? 'Model weather checks passed. No tower on site.' : 'Measured weather checks passed.') + ' Confirm label requirements and on site conditions before applying.', CAUTION: 'Marginal. Read the reasons and recheck before each tank.', STOP: 'Do not spray right now.', UNABLE: 'Unable to assess. This is not a GO.' }[ev.status];
     if (session.state === 'spraying' && ev.status === 'STOP') action = 'Stop spraying now.';
     $('statusAction').textContent = action;
     const ul = $('reasons'); ul.innerHTML = '';
@@ -105,24 +117,25 @@
     } else if (ev.ground.status === ev.status) { gm.className = 'gmiss same'; gm.textContent = 'Same result as the two height rules for this reading.'; }
     else { gm.className = 'gmiss same'; gm.textContent = 'The two height rules give ' + ev.status + ' for this reading.'; }
     $('clock').textContent = fmtTime(series[idx].min);
+    $('clockSub').textContent = isLive() ? (series[idx].min >= 1440 ? 'tomorrow, ' : '') + (idx > nowIdx() ? 'model forecast hour' : idx === nowIdx() ? 'this hour, model' : 'earlier model hour') + ', ' + TZ.abbr : 'measurement time, ' + TZ.abbr;
   }
 
   /* ---------- planned job ---------- */
   function renderJob() {
     const b = baseEvals(); b[idx] = evals[idx];
-    const j = E.jobAssessment(b, idx, stepMin, cfg.jobHours), endT = fmtTime(series[Math.min(series.length - 1, idx + j.runMin / stepMin)].min);
+    const j = E.jobAssessment(b, idx, stepMin, cfg.jobHours), endT = tm(series[Math.min(series.length - 1, idx + j.runMin / stepMin)].min);
     let tag, cls, txt;
     if (j.state === 'STOP') { tag = 'STOP'; cls = 'STOP'; txt = 'Current weather is STOP, so this job should not start now.'; }
     else if (j.state === 'UNKNOWN' && j.current === 'UNABLE') { tag = 'UNKNOWN'; cls = 'UNABLE'; txt = 'Current weather cannot be assessed, so the window for this job is unknown.'; }
-    else if (j.state === 'UNKNOWN') { tag = 'UNKNOWN'; cls = 'UNABLE'; txt = 'The data ends at ' + fmtTime(series[series.length - 1].min) + '. Only ' + durWords(j.runMin) + ' of suitable conditions are projected and this job needs ' + durWords(j.needMin) + '. The rest is not known.'; }
+    else if (j.state === 'UNKNOWN') { tag = 'UNKNOWN'; cls = 'UNABLE'; txt = 'The data ends at ' + tm(series[series.length - 1].min) + '. Only ' + durWords(j.runMin) + ' of suitable conditions are projected and this job needs ' + durWords(j.needMin) + '. The rest is not known.'; }
     else if (j.state === 'WAIT' && j.current === 'CAUTION') { tag = 'WAIT'; cls = 'CAUTION'; txt = 'Current weather is CAUTION.'; }
     else if (j.state === 'WAIT') { tag = 'WAIT'; cls = 'CAUTION'; txt = 'Only ' + durWords(j.runMin) + ' of projected suitable conditions remain for this ' + jobWords() + ' job.'; }
     else { tag = 'SUFFICIENT WINDOW'; cls = 'GO'; txt = durWords(j.runMin) + ' of projected suitable conditions, until ' + endT + '. This ' + jobWords() + ' job fits.'; }
     let nxt = '';
-    if (j.state !== 'SUFFICIENT') nxt = j.next ? 'Next projected suitable weather window: ' + fmtTime(series[j.next.start].min) + ' to ' + fmtTime(series[j.next.start].min + j.next.hours * 60) + ' (' + durWords(j.next.hours * 60) + ').'
+    if (j.state !== 'SUFFICIENT') nxt = j.next ? 'Next projected suitable weather window: ' + tm(series[j.next.start].min) + ' to ' + tm(series[j.next.start].min + j.next.hours * 60) + ' (' + durWords(j.next.hours * 60) + ').'
       : 'No later window of ' + durWords(j.needMin) + ' is projected in this data.';
     if (cfg.jobCost > 0 && j.state !== 'SUFFICIENT') nxt += ' Product cost you entered for this job: $' + Math.round(cfg.jobCost).toLocaleString('en-US') + '. That is what a wasted application puts at stake.';
-    const src = source.kind === 'sim' ? 'Projection source: the remaining samples of a known simulated day. This is a demonstration, not a forecast.' : 'Projection source: later rows of the imported file. This is not a forecast.';
+    const src = source.kind === 'sim' ? 'Projection source: the remaining samples of a known simulated day. This is a demonstration, not a forecast.' : isLive() ? 'Projection source: the regional model forecast for the hours ahead (Open-Meteo). A forecast for the area, not a measurement at the farm.' : 'Projection source: later rows of the imported file. This is not a forecast.';
     $('jobStrip').className = 'jobstrip ' + cls;
     $('jobStrip').innerHTML = '<div class="jl"><span class="jk">Current weather</span><span class="pill ' + evals[idx].status + '">' + evals[idx].status + '</span></div>' +
       '<div class="jl"><span class="jk">Planned job</span><span class="pill ' + cls + '">' + tag + '</span><span class="jt">' + esc(txt) + ' ' + esc(nxt) + '</span></div>' +
@@ -172,12 +185,12 @@
       s += '<text x="' + (mast + 26) + '" y="' + (y + 14) + '" font-size="15" font-weight="600" fill="#17201b">' + val + '</text>';
       return s;
     }
-    h += sensor(yHi, '#c2410c', 'Sensor at ' + cfg.hiLabel + ', above the canopy', r.tHi, r.wHi, r.dHi, 'ahH');
-    h += sensor(yLo, '#0b6e99', 'Sensor at ' + cfg.loLabel + ', ground station height', r.tLo, r.wLo, r.dLo, 'ahL');
+    h += sensor(yHi, '#c2410c', isLive() ? 'Model at 80 m, about 260 ft' : 'Sensor at ' + cfg.hiLabel + ', above the canopy', r.tHi, r.wHi, r.dHi, 'ahH');
+    h += sensor(yLo, '#0b6e99', isLive() ? 'Model near the ground (2 m air, 10 m wind)' : 'Sensor at ' + cfg.loLabel + ', ground station height', r.tLo, r.wLo, r.dLo, 'ahL');
     const dtTxt = ev.dT == null ? 'no comparison' : ev.dT > 0 ? f1(ev.dT) + '°F warmer at ' + cfg.hiLabel : ev.dT === 0 ? 'same temperature' : f1(-ev.dT) + '°F cooler at ' + cfg.hiLabel;
     h += '<rect x="322" y="8" width="230" height="30" rx="15" fill="' + (ev.dT == null ? '#5b6770' : inv ? '#b3261e' : near ? '#b96a00' : '#1c7c3c') + '"/>';
     h += '<text x="437" y="28" text-anchor="middle" font-size="14" font-weight="600" fill="#fff">' + dtTxt + '</text>';
-    h += '<text x="548" y="322" text-anchor="end" font-size="11" fill="#f4f1e6" opacity=".9">' + sourceName() + ', measured ' + fmtTime(series[idx].min) + '</text>';
+    h += '<text x="548" y="322" text-anchor="end" font-size="11" fill="#f4f1e6" opacity=".9">' + (isLive() ? 'Regional model, no tower at this site, ' + tm(series[idx].min) : sourceName() + ', measured ' + fmtTime(series[idx].min)) + '</text>';
     $('tower').innerHTML = h;
   }
 
@@ -202,8 +215,8 @@
     $('compass').innerHTML = h;
     $('miniStats').innerHTML =
       '<div><span>Temperature difference</span><b>' + (ev.dT == null ? 'n/a' : (ev.dT > 0 ? '+' : '') + f1(ev.dT) + ' °F') + '</b></div>' +
-      '<div><span>Wind speed difference</span><b>' + (ev.shearSpd == null ? 'n/a' : (ev.shearSpd > 0 ? '+' : '') + f1(ev.shearSpd) + ' mph') + '</b></div>' +
-      '<div><span>Wind direction difference</span><b>' + (ev.shearDir == null ? 'not reliable' : Math.round(ev.shearDir) + '°') + '</b></div>';
+      '<div><span>Wind speed difference</span><b>' + (isLive() ? 'needs a tower' : ev.shearSpd == null ? 'n/a' : (ev.shearSpd > 0 ? '+' : '') + f1(ev.shearSpd) + ' mph') + '</b></div>' +
+      '<div><span>Wind direction difference</span><b>' + (isLive() ? 'needs a tower' : ev.shearDir == null ? 'not reliable' : Math.round(ev.shearDir) + '°') + '</b></div>';
     renderBlock(ev);
   }
   /* Illustration only: shows which side the sensitive site is on. It does not recommend rows or buffers. */
@@ -254,7 +267,8 @@
     h += poly(series.map((s, i) => reading(i).wHi), x, yb, '#c2410c') + poly(series.map((s, i) => reading(i).wLo), x, yb, '#0b6e99');
     h += '<text x="' + (W - Rm - 4) + '" y="' + (bT + 10) + '" text-anchor="end" font-size="10" fill="#c2410c">' + cfg.hiLabel + '</text><text x="' + (W - Rm - 40) + '" y="' + (bT + 10) + '" text-anchor="end" font-size="10" fill="#0b6e99">' + cfg.loLabel + '</text>';
     const t0 = series[0].min, t1 = series[n - 1].min + stepMin;
-    for (let hr = Math.ceil(t0 / 60); hr * 60 <= t1; hr += (narrow ? 6 : 2)) {
+    const tick = (narrow ? 6 : 2) * (t1 - t0 > 1500 ? 2 : 1);
+    for (let hr = Math.ceil(t0 / 60 / tick) * tick; hr * 60 <= t1; hr += tick) {
       const xi = L + ((hr * 60 - t0) / (t1 - t0)) * (W - L - Rm);
       h += '<line x1="' + xi + '" y1="8" x2="' + xi + '" y2="272" stroke="#000" opacity=".07"/>';
       if (hr * 60 < t1) h += '<text x="' + (xi + 3) + '" y="290" font-size="11" fill="#5d665f">' + fmtTime(hr * 60).replace(':00', '') + '</text>';
@@ -267,7 +281,8 @@
     h += '<line x1="' + px + '" y1="0" x2="' + px + '" y2="276" stroke="#17201b" stroke-width="2"/><circle cx="' + px + '" cy="4" r="5" fill="#17201b"/>';
     svg.innerHTML = h;
     const missedH = base.filter(e => e.missed).length * stepMin / 60;
-    $('tlfoot').innerHTML = (source.kind === 'sim' ? 'In this simulated day' : 'In this imported data') + ', ground wind checks missed <b>' + f1(missedH) + ' hours</b> flagged by our two height rules. ' +
+    if (isLive()) { const nx = x(nowIdx() + 0.5); svg.innerHTML += '<text x="' + (nx + 4) + '" y="' + (H - 2) + '" font-size="10" font-weight="600" fill="#15212a">now</text><line x1="' + nx + '" y1="276" x2="' + nx + '" y2="292" stroke="#15212a"/>'; }
+    $('tlfoot').innerHTML = (source.kind === 'sim' ? 'In this simulated day' : isLive() ? 'In the regional model for today and tomorrow at this location' : 'In this imported data') + ', ground wind checks missed <b>' + f1(missedH) + ' hours</b> flagged by ' + (isLive() ? 'the inversion check' : 'our two height rules') + '. ' +
       '<span class="muted">Counted from the readings and the active thresholds. It is not a measure of drift prevented or of detection accuracy.</span>';
   }
   function tlPick(evn) {
@@ -278,7 +293,7 @@
 
   /* ---------- rules, monitoring, recent alerts ---------- */
   function renderRules() {
-    $('rulesLine').innerHTML = 'Active rules: inversion alert whenever ' + cfg.hiLabel + ' is warmer than ' + cfg.loLabel + '; wind ' + cfg.windMin + ' to ' + cfg.windMax + ' mph at both heights; speed difference ' + cfg.shearSpeed + ' mph; direction difference ' + cfg.shearDir + '°. <a href="#rulesSec" class="lnk" data-open="rulesSec">See all rules</a>';
+    $('rulesLine').innerHTML = 'Active rules: inversion alert whenever ' + cfg.hiLabel + ' is warmer than ' + cfg.loLabel + '; wind ' + cfg.windMin + ' to ' + cfg.windMax + ' mph at both heights; speed difference ' + cfg.shearSpeed + ' mph; direction difference ' + cfg.shearDir + '°. ' + (isLive() ? '<b>Live model mode:</b> only the inversion check, ground wind limits and the sensitive site check apply. Shear and upper wind checks need a tower. ' : '') + '<a href="#rulesSec" class="lnk" data-open="rulesSec">See all rules</a>';
     const rows = [
       ['Inversion', cfg.hiLabel + ' temperature greater than ' + cfg.loLabel + ' temperature', 'STOP. Any positive difference alerts. A difference inside ±' + cfg.sensorUnc + '°F sensor uncertainty is still shown, with a note.'],
       ['Small temperature difference', cfg.hiLabel + ' less than ' + cfg.sensorUnc + '°F cooler than ' + cfg.loLabel, 'CAUTION. The readings cannot rule out an inversion.'],
@@ -382,7 +397,7 @@
       'wind_lower_mph', 'wind_upper_mph', 'wind_lower_from_deg', 'wind_upper_from_deg', 'wind_speed_diff_mph', 'wind_dir_diff_deg', 'weather_status', 'ground_only_status', 'planned_job_status', 'alert_reasons',
       'wind_min_mph', 'wind_max_mph', 'speed_shear_threshold_mph', 'dir_shear_threshold_deg', 'sensor_uncertainty_f', 'job_hours', 'product_type', 'volatility', 'sensitive_site'];
     const rows = [head.join(',')];
-    log.slice().reverse().forEach(l => rows.push([csvq(l.measTs), csvq(TZ.name), csvq(l.eventTs), csvq(l.event), csvq(l.source), source.kind === 'sim' ? 'true' : 'false', n(l.ageMin), 5, 30, n(l.r.tLo), n(l.r.tHi), n(l.dT),
+    log.slice().reverse().forEach(l => rows.push([csvq(l.measTs), csvq(TZ.name), csvq(l.eventTs), csvq(l.event), csvq(l.source), source.kind === 'sim' ? 'true' : 'false', n(l.ageMin), isLive() ? 6.6 : 5, isLive() ? 262 : 30, n(l.r.tLo), n(l.r.tHi), n(l.dT),
       n(l.r.wLo), n(l.r.wHi), num(l.r.dLo) ? Math.round(l.r.dLo) : '', num(l.r.dHi) ? Math.round(l.r.dHi) : '', n(l.shearSpd), num(l.shearDir) ? Math.round(l.shearDir) : '', l.status, l.ground, l.job, csvq(l.reasons),
       l.th.windMin, l.th.windMax, l.th.shearSpeed, l.th.shearDir, l.th.sensorUnc, l.jobHours, csvq(l.product), csvq(l.vol), csvq(l.site)].join(',')));
     return rows.join('\r\n');
@@ -466,7 +481,14 @@
   function applyChange(evt) { recompute(); setNow(); lastStatus = evals[idx].status; renderRules(); addLog(evt); renderAll(); }
   function renderSource() {
     $('srcTag').textContent = sourceName();
+    $('blockName').textContent = isLive() ? FARM.name + ', ' + FARM.place + ' (example location)' : BLOCK_SIM;
+    $('modeSim').classList.toggle('on', !isLive()); $('modeLive').classList.toggle('on', isLive());
+    $('scen').hidden = isLive(); $('liveNow').hidden = !isLive(); $('demoReset').hidden = isLive();
+    $('liveNote').hidden = !isLive();
+    document.querySelector('.gtitle').textContent = isLive() ? 'Ground only comparison: model wind near the ground' : 'Ground station comparison: wind at 5 ft only';
+    if (isLive()) $('liveNote').innerHTML = '<span class="srcTag">Live regional model</span> Real weather model values for the ' + FARM.name + ' ' + FARM.place + ', fetched ' + source.fetched.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) + ' and refreshed every 10 minutes. Temperature at 2 m and 80 m, wind at 10 m and 80 m (Open-Meteo). <b>No tower is installed at the farm.</b> A regional model does not resolve one field, so treat this as the best available estimate until a two height tower is on site. Hours after now are forecast.';
     $('srcLabel').textContent = source.kind === 'sim' ? 'Sensors at 5 ft and 30 ft, one reading every ' + stepMin + ' minutes. Not live.'
+      : isLive() ? 'Open-Meteo model for the area, hourly. Not a measurement at the farm.'
       : 'File ' + source.file + ', ' + source.rows + ' readings measured ' + fmtTime(source.first) + ' to ' + fmtTime(source.last) + '. Last reading ' + fmtTime(source.last) + '. A file is not a live feed.';
     $('clockSub').textContent = 'measurement time, ' + TZ.abbr;
   }
@@ -491,7 +513,7 @@
     // Lay the readings on a regular time grid. A slot with no new reading carries the last one forward with its age, so gaps become stale.
     const out = []; let k = 0;
     for (let t = rows[0].min; t <= rows[rows.length - 1].min; t += step) { while (k + 1 < rows.length && rows[k + 1].min <= t) k++; out.push({ min: t, ageMin: t - rows[k].min, r: rows[k].r }); }
-    if (playing) togglePlay();
+    if (playing) togglePlay(); clearInterval(liveTimer); cfg.loLabel = E.DEFAULT_CFG.loLabel; cfg.hiLabel = E.DEFAULT_CFG.hiLabel; cfg.skipHiWind = false; cfg.skipShearSpeed = false;
     series = out; stepMin = step; source = { kind: 'import', file: name || 'file', rows: rows.length, first: rows[0].min, last: rows[rows.length - 1].min };
     session = idle(); fileRep = null; log = []; idx = 0; renderSource(); applyChange('DATA IMPORTED ' + source.file); renderFile();
   }
@@ -612,9 +634,9 @@
   }
   function fileRows(f) {
     const w = r => v1(r.wLo) + ' mph from ' + (num(r.dLo) ? E.compass(r.dLo) : 'n/a') + ' at 5 ft, ' + v1(r.wHi) + ' mph from ' + (num(r.dHi) ? E.compass(r.dHi) : 'n/a') + ' at 30 ft';
-    return [['Block', $('blockName').textContent], ['Date applied', dateStr() + ' (' + TZ.name + ')'], ['Time of application', fmtTime(f.start) + ' to ' + fmtTime(f.end)],
+    return [['Block', $('blockName').textContent], ['Date applied', dayDate(f.start) + ' (' + TZ.name + ')'], ['Time of application', fmtTime(f.start) + ' to ' + fmtTime(f.end)],
       ['Wind at start', w(f.rs)], ['Wind at finish', w(f.re)], ['Temperature at start', v1(f.rs.tLo) + '°F at 5 ft, ' + v1(f.rs.tHi) + '°F at 30 ft'],
-      ['Product type', f.product], ['Weather call during the job', f.worst + (f.alerts ? ', ' + f.alerts + ' alert' + (f.alerts > 1 ? 's' : '') : ', no alerts')], ['Data source', f.source + (source.kind === 'sim' ? ' (demonstration data)' : '')]];
+      ['Product type', f.product], ['Weather call during the job', f.worst + (f.alerts ? ', ' + f.alerts + ' alert' + (f.alerts > 1 ? 's' : '') : ', no alerts')], ['Data source', f.source + (source.kind === 'sim' ? ' (demonstration data)' : isLive() ? ' (Open-Meteo, not measured at the site)' : '')]];
   }
   function renderSaved() {
     const recs = loadSaved();
@@ -689,6 +711,49 @@
     try { const q = window.qrcode(0, 'M'); q.addData(LIVE_URL); q.make(); $('qrBox').innerHTML = q.createSvgTag({ cellSize: 5, margin: 2, scalable: true }); } catch (e) { $('qrBox').textContent = LIVE_URL; }
   }
 
+  /* ---------- live mode: real model weather for a real location ---------- */
+  let liveTimer = null, followNow = true, simSite = true;
+  function nowIdx() { if (!isLive()) return idx; const d = new Date(), m = d.getHours() * 60; let best = 0; series.forEach((s, i) => { if (s.min <= m) best = i; }); return best; }
+  async function fetchLive() {
+    const url = 'https://api.open-meteo.com/v1/forecast?latitude=' + FARM.lat + '&longitude=' + FARM.lon +
+      '&hourly=temperature_2m,temperature_80m,wind_speed_10m,wind_speed_80m,wind_direction_10m,wind_direction_80m&temperature_unit=fahrenheit&wind_speed_unit=mph&timezone=America%2FPhoenix&forecast_days=2';
+    const res = await fetch(url); if (!res.ok) throw new Error('HTTP ' + res.status);
+    const j = await res.json(), hh = j.hourly; if (!hh || !hh.time || hh.time.length < 24) throw new Error('unexpected response');
+    const d0 = hh.time[0].slice(0, 10), nn = v => (typeof v === 'number' && isFinite(v)) ? v : null;
+    return hh.time.map((t, i) => ({ min: (t.slice(0, 10) === d0 ? 0 : 1440) + (+t.slice(11, 13)) * 60, ageMin: 0,
+      r: { tLo: nn(hh.temperature_2m[i]), tHi: nn(hh.temperature_80m[i]), wLo: nn(hh.wind_speed_10m[i]), wHi: nn(hh.wind_speed_80m[i]), dLo: nn(hh.wind_direction_10m[i]), dHi: nn(hh.wind_direction_80m[i]) } })).slice(0, 48);
+  }
+  async function goLive() {
+    const btn = $('modeLive'); btn.disabled = true; btn.textContent = 'Loading live data…';
+    try {
+      const s = await fetchLive();
+      if (playing) togglePlay();
+      series = s; stepMin = 60; source = { kind: 'live', fetched: new Date() }; dropHi = false; $('optDropHi').checked = false;
+      cfg.loLabel = 'ground level'; cfg.hiLabel = '260 ft'; cfg.skipHiWind = true; cfg.skipShearSpeed = true;
+      simSite = cfg.siteOn; cfg.siteOn = false; fillForm();   // the demo school is invented, so it is not shown next to a real place
+      $('lat').value = FARM.lat; $('lon').value = FARM.lon;
+      session = idle(); fileRep = null; log = []; followNow = true; idx = nowIdx(); $('alertBar').hidden = true;
+      renderSource(); recompute(); setNow(); lastStatus = evals[idx].status; renderRules(); addLog('LIVE MODEL DATA LOADED'); renderAll(); renderFile(); applyNetwork(false);
+      clearInterval(liveTimer); liveTimer = setInterval(refreshLive, 600000);
+    } catch (e) { showAlert('CAUTION', 'Live data could not be loaded', 'The weather service did not answer, so nothing changed. You are still on the simulated demo day.'); }
+    btn.disabled = false; btn.textContent = 'Live: ' + FARM.name;
+  }
+  async function refreshLive() {
+    if (!isLive()) return;
+    try { const s = await fetchLive(); series = s; source.fetched = new Date(); }
+    catch (e) { const age = (Date.now() - source.fetched.getTime()) / 60000; series.forEach(x => { x.ageMin = age; }); }   // a failed refresh ages the data until it goes stale
+    if (followNow) idx = nowIdx(); idx = Math.min(idx, series.length - 1);
+    renderSource(); recompute(); setNow(); checkAlert(); renderAll();
+  }
+  function goSim() {
+    if (!isLive()) return; clearInterval(liveTimer); if (playing) togglePlay();
+    series = simSeries(); stepMin = S.STEP_MIN; source = { kind: 'sim' };
+    cfg.loLabel = E.DEFAULT_CFG.loLabel; cfg.hiLabel = E.DEFAULT_CFG.hiLabel; cfg.skipHiWind = false; cfg.skipShearSpeed = false; cfg.siteOn = simSite; fillForm();
+    $('lat').value = 32.69; $('lon').value = -114.62;
+    renderSource(); recompute(); renderRules(); resetDemo(); applyNetwork(false);
+  }
+  window.__sowRefresh = refreshLive;
+
   /* ---------- wire up ---------- */
   function openSec(id) { const d = $(id); if (d) { d.open = true; d.scrollIntoView({ behavior: 'smooth', block: 'start' }); } }
   function init() {
@@ -697,10 +762,12 @@
     $('play').onclick = () => { stopAt = null; togglePlay(); };
     $('speed').onchange = () => { if (playing) { clearInterval(timer); timer = setInterval(stepOnce, +$('speed').value); } };
     $('demoReset').onclick = resetDemo;
+    $('modeLive').onclick = () => { if (!isLive()) goLive(); }; $('modeSim').onclick = goSim;
+    $('liveNow').onclick = () => { followNow = true; jump(nowIdx()); };
     document.querySelectorAll('.jump').forEach(b => b.onclick = () => { if (playing) togglePlay(); jump(idxAt(+b.dataset.min));
       if (b.dataset.play) { stopAt = b.dataset.play; $('speed').value = '1000'; togglePlay(); } });
     let drag = false; const tl = $('tl');
-    tl.addEventListener('pointerdown', e => { drag = true; if (playing) togglePlay(); tlPick(e); });
+    tl.addEventListener('pointerdown', e => { drag = true; followNow = false; if (playing) togglePlay(); tlPick(e); });
     window.addEventListener('pointermove', e => { if (drag) tlPick(e); });
     window.addEventListener('pointerup', () => { drag = false; });
     window.addEventListener('resize', renderTimeline);
@@ -716,8 +783,8 @@
     $('optPush').onchange = () => { if ($('optPush').checked && 'Notification' in window && Notification.permission !== 'granted') { try { Notification.requestPermission(); } catch (e) {} } };
     $('csvSample').onclick = sampleCsv;
     $('csvIn').onchange = e => { const f = e.target.files[0]; if (!f) return; const fr = new FileReader(); fr.onload = () => loadCsv(String(fr.result), f.name); fr.readAsText(f); e.target.value = ''; };
-    $('resetBtn').onclick = () => { if (playing) togglePlay(); cfg = Object.assign({ jobCost: 0 }, E.DEFAULT_CFG); saveCfg(); series = simSeries(); stepMin = S.STEP_MIN; source = { kind: 'sim' }; dropHi = false; $('optDropHi').checked = false; $('cfgErr').hidden = true;
-      fillForm(); renderSource(); recompute(); renderRules(); resetDemo(); if (fcState) renderForecast(); };
+    $('resetBtn').onclick = () => { if (playing) togglePlay(); clearInterval(liveTimer); cfg = Object.assign({ jobCost: 0 }, E.DEFAULT_CFG); saveCfg(); series = simSeries(); stepMin = S.STEP_MIN; source = { kind: 'sim' }; dropHi = false; $('optDropHi').checked = false; $('cfgErr').hidden = true;
+      $('lat').value = 32.69; $('lon').value = -114.62; fillForm(); renderSource(); recompute(); renderRules(); resetDemo(); if (fcState) renderForecast(); };
     $('fcBtn').onclick = loadForecast;
     $('fcSec').addEventListener('toggle', () => { if ($('fcSec').open && !fcState) loadForecast(); });
     document.addEventListener('click', e => { const a = e.target.closest('[data-open],#openRecord'); if (!a) return; e.preventDefault(); openSec(a.dataset.open || 'recordSec'); });
@@ -727,7 +794,7 @@
     $('pestSel').innerHTML = window.SprayPests.map(p => '<option value="' + p.id + '">' + esc(p.name) + '</option>').join(''); $('pestSel').onchange = renderPest; renderPest();
     $('wlBtn').onclick = joinWaitlist; renderQr();
     renderNetwork(); pullNetwork(false); setInterval(() => pullNetwork(true), 8000);
-    window.__sow = { state: () => ({ idx: idx, time: fmtTime(series[idx].min), status: evals[idx].status, ground: evals[idx].ground.status, logLen: log.length, playing: playing, source: source.kind }) };
+    window.__sow = { state: () => ({ idx: idx, time: fmtTime(series[idx].min), status: evals[idx].status, ground: evals[idx].ground.status, logLen: log.length, playing: playing, source: source.kind, n: series.length, step: stepMin }) };
   }
   init();
 })();

@@ -8,6 +8,20 @@ async def main():
     async with async_playwright() as p:
         b = await p.chromium.launch(executable_path='/usr/bin/google-chrome', args=['--no-sandbox'])
         ctx = await b.new_context(viewport={'width':1366,'height':900})
+        import datetime, math
+        d0 = datetime.datetime.now().replace(minute=0, second=0, microsecond=0, hour=0)
+        T=[]; t2=[]; t80=[]; w10=[]; w80=[]; dd10=[]; dd80=[]
+        for i in range(48):
+            hr = i % 24; T.append((d0 + datetime.timedelta(hours=i)).strftime('%Y-%m-%dT%H:00'))
+            day = 8 <= hr <= 17
+            t2.append(70.0 if day else 50.0); t80.append(66.0 if day else 56.0)
+            w10.append(5.0 if day else 4.0); w80.append(15.0); dd10.append(330); dd80.append(300)
+        MOCK = json.dumps({'utc_offset_seconds': 0, 'hourly': {'time': T, 'temperature_2m': t2, 'temperature_80m': t80, 'wind_speed_10m': w10, 'wind_speed_80m': w80, 'wind_direction_10m': dd10, 'wind_direction_80m': dd80}})
+        live_ok = {'v': True}
+        async def wx(route):
+            if live_ok['v']: await route.fulfill(status=200, content_type='application/json', body=MOCK, headers={'access-control-allow-origin': '*'})
+            else: await route.abort()
+        await ctx.route('**/api.open-meteo.com/**', wx)
         pg = await ctx.new_page(); errs=[]
         pg.on('pageerror', lambda e: errs.append(str(e)))
         await pg.goto(URL); await pg.wait_for_timeout(1500)
@@ -93,6 +107,27 @@ async def main():
         await pg.click('.jump[data-min="975"]'); await pg.click('#demoReset'); await pg.wait_for_timeout(200); s = await st()
         ck('reset demo returns to 6:10 AM and keeps settings and saved records', s['time']=='6:10 AM' and s['logLen']==1 and await pg.input_value('#cfgJob')=='3' and 'Test Applicator' in await txt('#savedList'), s)
         await pg.fill('#cfgJob','2'); await pg.dispatch_event('#cfgJob','change')
+        # live mode with a mocked weather service
+        live_ok['v'] = False
+        await pg.evaluate("document.getElementById('modeLive').click()"); await pg.wait_for_timeout(700); s = await st()
+        ck('live: service failure leaves the demo untouched and says so', s['source']=='sim' and 'could not be loaded' in await txt('#alertBar'), s)
+        live_ok['v'] = True
+        await pg.evaluate("document.getElementById('modeLive').click()"); await pg.wait_for_timeout(900); s = await st()
+        hr = datetime.datetime.now().hour; exp = 'GO' if 8 <= hr <= 17 else 'STOP'
+        ck('live: real location data loaded, 48 hourly values', s['source']=='live' and s['n']==48 and s['step']==60, s)
+        ck('live: opens on the current hour with the expected call', s['status']==exp, (s, exp))
+        ck('live: labelled as a regional model for the SouthWinds Farm area', 'Live regional model' in await txt('#srcTag') and 'SouthWinds Farm area' in await txt('#blockName') and 'No tower is installed' in await txt('#liveNote'))
+        ck('live: demo scenarios hidden, go to now shown', not await pg.is_visible('#scen') and await pg.is_visible('#liveNow'))
+        ck('live: 260 ft model wind is not judged against the canopy limit', 'limit at 260 ft' not in await txt('#reasons') and 'Live model mode' in await txt('#rulesLine'), await txt('#reasons'))
+        ck('live: the invented demo school is not shown at a real place', 'school' not in await txt('#reasons') and 'school' not in await txt('#blockTxt'), await txt('#reasons'))
+        ck('live: planned job cites the regional model forecast', 'regional model forecast' in await txt('#jobStrip'))
+        rows2 = list(C.reader(io.StringIO(await pg.evaluate('window.__sowCsv()'))))
+        ck('live: record names the source and model heights', rows2[1][4]=='Live regional model' and rows2[1][5]=='false' and rows2[1][7]=='6.6' and rows2[1][8]=='262', rows2[1][:9])
+        live_ok['v'] = False; await pg.evaluate('window.__sowRefresh()'); await pg.wait_for_timeout(500); s = await st()
+        ck('live: a failed refresh keeps the last data without crashing', s['source']=='live' and s['status'] in ('GO','STOP','CAUTION','UNABLE'), s)
+        live_ok['v'] = True
+        await pg.evaluate("document.getElementById('modeSim').click()"); await pg.wait_for_timeout(500); s = await st()
+        ck('back to demo day: 6:10 AM STOP with 30 ft labels', s['source']=='sim' and s['time']=='6:10 AM' and s['status']=='STOP' and 'Air at 30 ft' in await txt('#reasons') and await pg.is_visible('#scen'), s)
         # what, when, how
         await pg.click('.jump[data-min="660"]'); await pg.wait_for_timeout(200)
         ck('what when how band is on the main screen', await pg.is_visible('#whatSel') and 'Now.' in await txt('#whenBox') and 'coarsest droplets' in await txt('#howBox'), await txt('#whenBox'))

@@ -75,6 +75,18 @@ The status is the worst single flag. Nothing is averaged, so no good reading can
 
 No build step. Open `index.html` in a browser, or serve the folder with any static host.
 
+## Live mode: real weather for a real place
+
+The header has a switch between **Demo day** and **Live: SouthWinds Farm area**. Live mode pulls the current regional weather model for the area near Benson, Arizona, where one of the growers we interviewed farms (Open-Meteo, hourly, today and tomorrow, refreshed every 10 minutes).
+
+What is real: the location, the time, and the model values (temperature at 2 m and 80 m, wind at 10 m).
+
+What is not: there is no tower at the farm. A regional model does not resolve one field, so this is an estimate until a two height tower is on site. The page says so wherever the data appears.
+
+In live mode only three rules run: the inversion check (80 m air warmer than 2 m air means STOP), the ground wind limits, and stale data handling. Shear and upper wind rules are switched off because 80 m wind is far above any canopy. The demo school is hidden because it is invented. If the weather service fails, the app stays on the demo day and says so. If a refresh fails, the data ages until it goes stale and the status becomes UNABLE.
+
+Coordinates are rounded to the area, not the farm address.
+
 ## Tests
 
 ```

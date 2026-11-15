@@ -17,6 +17,10 @@
     <div id="blockName">Block 7, lemons, Yuma County, Arizona</div>
     <div class="src"><span class="srcTag" id="srcTag">Simulated tower readings</span> <span id="srcLabel"></span></div>
   </div>
+  <div class="modes" role="group" aria-label="Data source">
+    <button id="modeSim" class="mode on" type="button">Demo day</button>
+    <button id="modeLive" class="mode" type="button">Live: SouthWinds Farm area</button>
+  </div>
   <div class="clock"><div id="clock">6:10 AM</div><div class="src" id="clockSub">measurement time, MST</div></div>
 </header>
 
@@ -71,10 +75,12 @@
           <option value="350" selected>15 min per second</option>
           <option value="120">40 min per second</option>
         </select>
+        <button id="liveNow" class="btn" hidden>Go to now</button>
         <button id="demoReset" class="btn">Reset demo</button>
       </div>
     </div>
-    <div class="scen">
+    <div id="liveNote" class="liveNote" hidden></div>
+    <div class="scen" id="scen">
       <button class="btn jump" data-min="370"><b>Hidden inversion</b><span>6:10 AM. Ground wind looks acceptable.</span></button>
       <button class="btn jump" data-min="660"><b>Suitable at both heights</b><span>11:00 AM. All measured checks pass.</span></button>
       <button class="btn jump" data-min="975"><b>Upper wind risk</b><span>4:15 PM. Ground reading misses it.</span></button>
