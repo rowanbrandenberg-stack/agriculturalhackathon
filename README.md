@@ -36,6 +36,10 @@ Other features:
 
 * **Arizona citrus pest guide.** For the main Arizona citrus pests: when they matter, how to scout, the action threshold, the options University of Arizona Extension lists, and how to keep the grove's natural enemies working. One click sets the matching spray profile. It is a sourced reference for the PCA conversation, not a prescription.
 
+* **Report filed for you.** When a spray job ends, the app fills in an application report from the tower record (time of application, wind direction and speed at both heights, temperature, product type, the tower's call during the job). One tap sends it. The fields match what Arizona's Form 1080 asks for. In this demo it does not file with the state.
+* **Grower heatmap.** A map of where growers nearby are reporting risk, built from the shared database, with one tap report buttons. The demo adds clearly labeled sample reports so the map is not empty.
+* **Simple main screen.** Status, picture, timeline, spray and report, heatmap. Everything else sits behind Show details.
+
 ## Run it
 
 No build step. Open `index.html` in a browser, or serve the folder with any static host.

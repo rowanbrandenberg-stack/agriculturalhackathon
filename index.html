@@ -73,19 +73,36 @@
     <div class="tlfoot" id="tlfoot"></div>
   </section>
 
+  <section class="simple" id="report">
+    <div class="card act">
+      <h2>1. Spray</h2>
+      <div id="sessionBox" class="sessionBox"></div>
+      <button id="sprayBtn" class="btn primary big">Start spraying</button>
+      <h2 class="mt">2. Report filed for you</h2>
+      <div id="fileBox" class="fileBox"><div class="muted">When you finish, your required application report is filled in from the tower record. One tap sends it.</div></div>
+    </div>
+    <div class="card">
+      <div class="tlhead"><h2>Grower heatmap</h2><div class="muted small" id="heatState"></div></div>
+      <div class="heatwrap">
+        <svg id="heatMap" viewBox="0 0 320 320" role="img" aria-label="Heatmap of grower reports near this block"></svg>
+        <div class="quick">
+          <div class="qt">See something? One tap tells growers nearby.</div>
+          <button class="qbtn q1" data-kind="inversion"><span>&#9729;</span>Air not moving<small>smoke or dust hanging flat</small></button>
+          <button class="qbtn q2" data-kind="drift"><span>&#10138;</span>I saw drift</button>
+          <button class="qbtn q3" data-kind="crew"><span>&#9823;</span>Crew in field</button>
+          <div class="heatleg"><i></i><span>few reports</span><span>many</span></div>
+          <div id="quickMsg" class="muted small"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="moreBar"><button id="moreBtn" class="btn">Show details</button><span class="muted small">Settings, forecast, pest guide, full grower network, spray record</span></div>
+  <div id="more" hidden>
   <section class="grid3">
     <div class="card">
       <h2>Next safe window</h2>
       <div id="windowBox" class="windowBox"></div>
-      <h2 class="mt">Spray session</h2>
-      <div id="sessionBox" class="sessionBox"></div>
-      <div class="row">
-        <button id="sprayBtn" class="btn primary">Start spraying</button>
-      </div>
-      <div class="note">
-        <label for="noteIn">Applicator note (goes in the record)</label>
-        <div class="row"><input id="noteIn" type="text" placeholder="Example: checked smoke bomb, drift moving south"><button id="noteBtn" class="btn">Add</button></div>
-      </div>
     </div>
 
     <div class="card">
@@ -175,6 +192,8 @@
         <button id="logClear" class="btn">Clear</button>
       </div>
     </div>
+    <div class="note"><label for="noteIn">Applicator note (goes in the record)</label>
+      <div class="row"><input id="noteIn" type="text" placeholder="Example: checked smoke bomb, drift moving south"><button id="noteBtn" class="btn">Add</button></div></div>
     <div class="logwrap">
       <table id="log"><thead><tr>
         <th>Time</th><th>Event</th><th>Status</th><th>Ground only</th><th>5 ft °F</th><th>30 ft °F</th><th>Diff</th><th>5 ft wind</th><th>30 ft wind</th><th>What triggered it</th>
@@ -182,11 +201,13 @@
     </div>
   </section>
 
+  </div>
+
   <footer>
     Spray or Wait supports the applicator's decision. It does not replace the pesticide label, on site checks or regulations, and no system can guarantee zero drift. Wind limits of 3 to 10 mph are common guidance and every limit here can be set to match the label. Tower data in this demo is simulated.
   </footer>
 </main>
-<button id="fab" class="fab" type="button">Report from the field</button>
+<button id="fab" class="fab" type="button">Report</button>
 <script src="engine.js"></script>
 <script src="sim.js"></script>
 <script src="pests.js"></script>

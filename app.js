@@ -237,8 +237,9 @@
     const px = x(idx + 0.5);
     h += '<line x1="' + px + '" y1="0" x2="' + px + '" y2="276" stroke="#17201b" stroke-width="2"/><circle cx="' + px + '" cy="4" r="5" fill="#17201b"/>';
     svg.innerHTML = h;
-    const missedH = evals.filter(e => e.ground.status === 'GO' && e.status !== 'GO').length * stepMin / 60;
-    const stopMiss = evals.filter(e => e.ground.status === 'GO' && e.status === 'STOP').length * stepMin / 60;
+    const base = evals.map((e, i) => i === overIdx ? E.evaluate(data[i], cfg) : e);  // day totals ignore live network reports
+    const missedH = base.filter(e => e.ground.status === 'GO' && e.status !== 'GO').length * stepMin / 60;
+    const stopMiss = base.filter(e => e.ground.status === 'GO' && e.status === 'STOP').length * stepMin / 60;
     $('tlfoot').innerHTML = 'Today a ground station alone would have said "looks fine" for <b>' + f1(missedH) + ' hours</b> that the tower flagged, including <b>' + f1(stopMiss) + ' hours</b> the tower called STOP.';
   }
   function tlPick(evn) {
@@ -292,10 +293,12 @@
     const nowMin = data[idx].min, ev = evals[idx];
     if (session.state === 'idle') {
       session = { state: 'spraying', startMin: nowMin, endMin: null, watchUntil: null };
+      fileRep = null; renderFile();
       addLog('SPRAY START' + (ev.status !== 'GO' ? ' (started on ' + ev.status + ')' : ''));
     } else if (session.state === 'spraying') {
       session.state = 'watch'; session.endMin = nowMin; session.watchUntil = nowMin + WATCH_HOURS[cfg.volatility] * 60;
       addLog('SPRAY END, watch for ' + WATCH_HOURS[cfg.volatility] + ' h');
+      buildFile();
     } else { addLog('WATCH ENDED'); session = { state: 'idle', startMin: null, endMin: null, watchUntil: null }; }
     renderAll();
   }
@@ -501,18 +504,81 @@
     } catch (e) { netOnline = false; }
     applyNetwork(announce);
   }
-  async function sendReport() {
-    const me = blockPos(), d = parseFloat($('repDist').value), b = parseFloat($('repDir').value), rad = Math.PI / 180;
-    const row = { kind: $('repKind').value, lat: +(me.lat + d * Math.cos(b * rad) / 69.0).toFixed(3), lon: +(me.lon + d * Math.sin(b * rad) / (69.17 * Math.cos(me.lat * rad))).toFixed(3), note: $('repNote').value.trim().slice(0, 140) || null };
-    $('repBtn').disabled = true; let saved = null;
+  async function postReport(kind, d, b, note) {
+    const me = blockPos(), rad = Math.PI / 180;
+    const row = { kind: kind, lat: +(me.lat + d * Math.cos(b * rad) / 69.0).toFixed(3), lon: +(me.lon + d * Math.sin(b * rad) / (69.17 * Math.cos(me.lat * rad))).toFixed(3), note: (note || '').trim().slice(0, 140) || null };
+    let saved = null;
     try {
       const res = await fetch(SB_URL, { method: 'POST', headers: { apikey: SB_KEY, Authorization: 'Bearer ' + SB_KEY, 'Content-Type': 'application/json', Prefer: 'return=representation' }, body: JSON.stringify(row) });
       if (!res.ok) throw new Error('HTTP ' + res.status); saved = (await res.json())[0]; netOnline = true;
     } catch (e) { netOnline = false; }
     netLocal.unshift(saved || Object.assign({ id: 'local' + Date.now(), created_at: new Date().toISOString(), local: true }, row));
+    addLog('REPORT SENT: ' + KIND[kind][0]); applyNetwork(true);
+    return !!saved;
+  }
+  async function sendReport() {
+    $('repBtn').disabled = true;
+    const ok = await postReport($('repKind').value, parseFloat($('repDist').value), parseFloat($('repDir').value), $('repNote').value);
     $('repBtn').disabled = false; $('repNote').value = '';
-    $('repMsg').textContent = saved ? 'Shared with growers nearby.' : 'No connection. Saved on this device only.';
-    addLog('REPORT SENT: ' + KIND[row.kind][0]); applyNetwork(true);
+    $('repMsg').textContent = ok ? 'Shared with growers nearby.' : 'No connection. Saved on this device only.';
+  }
+
+  /* ---------- report filed for you (pre-fills what Arizona Form 1080 asks for) ---------- */
+  let fileRep = null;
+  function buildFile() {
+    const iS = Math.round(session.startMin / stepMin), iE = Math.min(data.length - 1, Math.round(session.endMin / stepMin));
+    let worst = 'GO'; for (let i = iS; i <= iE; i++) { const b = E.evaluate(data[i], cfg).status; if (E.RANK[b] > E.RANK[worst]) worst = b; }
+    fileRep = { start: session.startMin, end: session.endMin, rs: data[iS], re: data[iE], worst: worst,
+      alerts: log.filter(l => l.min >= session.startMin && l.min <= session.endMin && /^ALERT/.test(l.event)).length, product: PROFILES[cfg.profile || 'custom'].name, filed: null };
+    renderFile();
+  }
+  function fileText() {
+    const f = fileRep, w = r => f1(r.wLo) + ' mph from ' + E.compass(r.dLo) + ' at 5 ft, ' + f1(r.wHi) + ' mph from ' + E.compass(r.dHi) + ' at 30 ft';
+    return [['Block', $('blockName').textContent], ['Date applied', stamp(f.start).slice(0, 10)], ['Time of application', fmtTime(f.start) + ' to ' + fmtTime(f.end)],
+      ['Wind at start', w(f.rs)], ['Wind at finish', w(f.re)], ['Temperature', f1(f.rs.tLo) + '°F at 5 ft, ' + f1(f.rs.tHi) + '°F at 30 ft'],
+      ['Product type', f.product], ['Tower call during the job', f.worst + (f.alerts ? ', ' + f.alerts + ' alert' + (f.alerts > 1 ? 's' : '') : ', no alerts')]];
+  }
+  function renderFile() {
+    const box = $('fileBox');
+    if (!fileRep) { box.innerHTML = '<div class="muted">When you finish, your required application report is filled in from the tower record. One tap sends it.</div>'; return; }
+    let h = '<table class="ft">' + fileText().map(r => '<tr><th>' + r[0] + '</th><td>' + esc(r[1]) + '</td></tr>').join('') + '</table>';
+    if (fileRep.filed) h += '<div class="filed"><b>Sent for you.</b> Confirmation ' + fileRep.filed + '. Your conditions were also shared, with no name, to sharpen the call for growers nearby.</div>';
+    else h += '<button id="fileBtn" class="btn primary big">Send my report</button>';
+    h += '<div class="row"><button id="fileDl" class="btn">Download a copy</button></div>';
+    h += '<div class="muted small">Fills in the time of application and wind direction and speed that Arizona Form 1080 asks for. Demo: it does not file with the state yet.</div>';
+    box.innerHTML = h;
+    const fb = $('fileBtn'); if (fb) fb.onclick = async () => { fb.disabled = true; fb.textContent = 'Sending…';
+      await postReport('spraying', 0, 0, 'Application report. Tower call during job: ' + fileRep.worst);
+      fileRep.filed = 'SOW ' + stamp(fileRep.start).slice(5, 10).replace('-', '') + ' ' + String(Math.floor(1000 + Math.random() * 9000)) + ' (demo)';
+      addLog('APPLICATION REPORT SENT ' + fileRep.filed); renderFile(); };
+    $('fileDl').onclick = () => download('application_report_' + stamp(fileRep.start).slice(0, 10) + '.txt', 'SPRAY OR WAIT: APPLICATION REPORT\n\n' + fileText().map(r => r[0] + ': ' + r[1]).join('\n') + (fileRep.filed ? '\nConfirmation: ' + fileRep.filed : '') + '\n');
+  }
+
+  /* ---------- grower heatmap ---------- */
+  const SAMPLE = (function () { let s = 11; const rnd = () => (s = (s * 16807) % 2147483647) / 2147483647; const out = [];
+    [[1.6, 1.3, 'inversion', 9], [-1.9, 0.4, 'drift', 6], [0.7, -1.8, 'spraying', 7], [-0.9, -1.4, 'crew', 3], [2.3, -0.6, 'inversion', 4]].forEach(c => {
+      for (let i = 0; i < c[3]; i++) out.push({ kind: c[2], dx: c[0] + (rnd() - 0.5) * 1.3, dy: c[1] + (rnd() - 0.5) * 1.3, ageMin: 20 + rnd() * 300 }); });
+    return out; })();
+  function renderHeat() {
+    const S = 320, N = 20, span = 3, px = m => S / 2 + m / span * (S / 2), py = m => S / 2 - m / span * (S / 2), W = { drift: 3, inversion: 2, crew: 1.2, spraying: 1 };
+    const real = community.filter(c => c.distMi <= span * 1.3).map(c => ({ kind: c.kind, dx: c.distMi * Math.sin(c.bearing * Math.PI / 180), dy: c.distMi * Math.cos(c.bearing * Math.PI / 180), ageMin: c.ageMin, real: true }));
+    const pts = real.concat(SAMPLE);
+    let h = '<defs><clipPath id="hc"><rect x="0" y="0" width="' + S + '" height="' + S + '" rx="14"/></clipPath></defs><g clip-path="url(#hc)"><rect width="' + S + '" height="' + S + '" fill="#e9e4d4"/>';
+    let q = 5; const r2 = () => (q = (q * 16807) % 2147483647) / 2147483647;           // patchwork of fields so it reads as a map
+    for (let i = 0; i < 6; i++) for (let j = 0; j < 6; j++) h += '<rect x="' + (i * S / 6 + 1.5) + '" y="' + (j * S / 6 + 1.5) + '" width="' + (S / 6 - 3) + '" height="' + (S / 6 - 3) + '" rx="3" fill="' + ['#d7e0bf', '#cddab0', '#e2dcc0', '#d3ddb8'][Math.floor(r2() * 4)] + '"/>';
+    const cell = S / N; let vmax = 0; const vals = [];
+    for (let i = 0; i < N; i++) for (let j = 0; j < N; j++) { const mx = ((i + 0.5) / N * 2 - 1) * span, my = -((j + 0.5) / N * 2 - 1) * span; let v = 0;
+      pts.forEach(p => { const d2 = (p.dx - mx) ** 2 + (p.dy - my) ** 2; v += W[p.kind] * Math.exp(-d2 / 0.6) * Math.max(0.3, 1 - p.ageMin / 480); }); vals.push([i, j, v]); if (v > vmax) vmax = v; }
+    vals.forEach(([i, j, v]) => { const t = v / Math.max(vmax, 3); if (t < 0.07) return;
+      const c = t < 0.5 ? [250 + (249 - 250) * t * 2, 204 + (115 - 204) * t * 2, 21] : [249 + (179 - 249) * (t - 0.5) * 2, 115 + (38 - 115) * (t - 0.5) * 2, 22 + 8 * (t - 0.5) * 2];
+      h += '<rect x="' + (i * cell) + '" y="' + (j * cell) + '" width="' + (cell + 0.5) + '" height="' + (cell + 0.5) + '" fill="rgb(' + c.map(Math.round).join(',') + ')" opacity="' + (0.25 + 0.6 * t).toFixed(2) + '"/>'; });
+    [1, 2, 3].forEach(m => { h += '<circle cx="' + S / 2 + '" cy="' + S / 2 + '" r="' + (m / span * S / 2) + '" fill="none" stroke="#17201b" stroke-opacity=".28" stroke-dasharray="3 5"/><text x="' + (S / 2 + 4) + '" y="' + (S / 2 - m / span * S / 2 + 12) + '" font-size="9" fill="#17201b" opacity=".6">' + m + ' mi</text>'; });
+    real.forEach(p => { h += '<circle cx="' + px(p.dx) + '" cy="' + py(p.dy) + '" r="6" fill="' + KIND[p.kind][1] + '" stroke="#fff" stroke-width="2"/>'; });
+    if (cfg.siteOn) { const sx = px(0.45 * Math.sin(cfg.siteBearing * Math.PI / 180)), sy = py(0.45 * Math.cos(cfg.siteBearing * Math.PI / 180)); h += '<circle cx="' + sx + '" cy="' + sy + '" r="5" fill="#b3261e" stroke="#fff" stroke-width="1.5"/><text x="' + (sx + 8) + '" y="' + (sy + 4) + '" font-size="10" font-weight="800" fill="#b3261e">' + esc(cfg.siteName) + '</text>'; }
+    h += '<rect x="' + (S / 2 - 9) + '" y="' + (S / 2 - 9) + '" width="18" height="18" rx="4" fill="#1f3d2b" stroke="#fff" stroke-width="2"/><text x="' + S / 2 + '" y="' + (S / 2 + 24) + '" text-anchor="middle" font-size="10" font-weight="800" fill="#1f3d2b">YOU</text>';
+    h += '<text x="' + S / 2 + '" y="14" text-anchor="middle" font-size="11" font-weight="800" fill="#17201b">N</text></g>';
+    $('heatMap').innerHTML = h;
+    $('heatState').textContent = (netOnline ? real.length + ' live report' + (real.length === 1 ? '' : 's') + ' nearby' : 'Offline') + ' + sample reports for the demo';
   }
   function renderNetwork() {
     const cx = 120, cy = 120, R = 100, me = community;
@@ -528,11 +594,15 @@
     let f = '';
     me.slice(0, 12).forEach(c => { f += '<li><span class="dot" style="background:' + KIND[c.kind][1] + '"></span><div><b>' + KIND[c.kind][0] + '</b> ' + (c.distMi < 0.15 ? 'at this block' : f1(c.distMi) + ' mi ' + E.compass(c.bearing)) + ' · ' + (c.ageMin < 1 ? 'just now' : c.ageMin < 60 ? Math.round(c.ageMin) + ' min ago' : f1(c.ageMin / 60) + ' h ago') + (using.has(c.kind) ? ' <span class="used">changing your call</span>' : '') + (c.note ? '<div class="nt">' + esc(c.note) + '</div>' : '') + '</div></li>'; });
     $('netFeed').innerHTML = f || '<li class="muted">No reports within 5 miles in the last 8 hours.</li>';
+    renderHeat();
     $('netState').textContent = netOnline === null ? 'Connecting…' : netOnline ? 'Live. Shared database, ' + me.length + ' recent report' + (me.length === 1 ? '' : 's') + ' nearby.' : 'Offline. Showing reports made on this device only.';
   }
   function initNetwork() {
     $('repBtn').onclick = sendReport; renderNetwork(); pullNetwork(false);
-    $('fab').onclick = () => { $('network').scrollIntoView({ behavior: 'smooth' }); };
+    $('fab').onclick = () => { $('report').scrollIntoView({ behavior: 'smooth' }); };
+    document.querySelectorAll('.qbtn').forEach(b => b.onclick = async () => { b.disabled = true; const ok = await postReport(b.dataset.kind, 0, 0, null); b.disabled = false;
+      $('quickMsg').textContent = ok ? 'Shared with growers nearby. Thank you.' : 'No connection. Saved on this device only.'; });
+    $('moreBtn').onclick = () => { const m = $('more'); m.hidden = !m.hidden; $('moreBtn').textContent = m.hidden ? 'Show details' : 'Hide details'; };
     setInterval(() => pullNetwork(true), 8000);
     ['lat', 'lon'].forEach(id => $(id).addEventListener('change', () => applyNetwork(false)));
   }
