@@ -3,7 +3,7 @@
   const E = window.SprayEngine, S = window.SpraySim;
   const $ = id => document.getElementById(id);
   const f1 = E.f1;
-  const BUILD = '2026-11-15.16';
+  const BUILD = '2026-11-15.17';
   /* Live mode: a real location, real model weather. Rounded coordinates for the area, not the farm's address. No tower is installed there. */
   const FARM = { name: 'SouthWinds Farm area', place: 'near Benson, Arizona', lat: 31.97, lon: -110.29 };
   const BLOCK_SIM = 'Block 7, lemons, Yuma County, Arizona';
@@ -463,7 +463,12 @@
 
   /* ---------- playback and scenarios ---------- */
   function renderAll() { renderStatus(); renderJob(); renderTower(); renderCompass(); renderTimeline(); renderSession(); renderNeighbor(); renderWWW(); renderKrig(); }
-  function stepOnce() { if (idx >= series.length - 1) { if (playing) togglePlay(); return; } idx++; setNow(); checkAlert(); renderAll(); }
+  function stepOnce() {
+    if (idx >= series.length - 1) {
+      /* The demo day loops so playback can run unattended. It never loops during a spray job, a scenario run or live data. */
+      if (source.kind === 'sim' && session.state === 'idle' && stopAt == null) { idx = 0; setNow(); lastStatus = evals[idx].status; renderAll(); return; }
+      if (playing) togglePlay(); return;
+    } idx++; setNow(); checkAlert(); renderAll(); }
   function togglePlay() {
     playing = !playing; $('play').textContent = playing ? 'Pause' : 'Play'; $('play').classList.toggle('playing', playing);
     clearInterval(timer); if (playing) timer = setInterval(stepOnce, +$('speed').value); else stopAt = null;
@@ -916,7 +921,8 @@
     ['svAcres', 'svCost', 'svJobs', 'svBad', 'svLost', 'svTower'].forEach(id => $(id).addEventListener('input', renderSavings)); renderSavings();
     $('wlBtn').onclick = joinWaitlist; renderQr();
     renderNetwork(); pullNetwork(false); setInterval(() => pullNetwork(true), 8000);
-    window.__sow = { state: () => ({ idx: idx, time: fmtTime(series[idx].min), status: evals[idx].status, weather: evals[idx].weather, concerns: evals[idx].concerns.length, feed: netOnline, used: usedCommunity().length, ground: evals[idx].ground.status, logLen: log.length, playing: playing, source: source.kind, n: series.length, step: stepMin }) };
+    if (/[?&]auto\b/.test(location.search)) togglePlay();   // add ?auto to the address to start the demo playing on load
+    window.__sow = { seek: i => jump(i), state: () => ({ idx: idx, time: fmtTime(series[idx].min), status: evals[idx].status, weather: evals[idx].weather, concerns: evals[idx].concerns.length, feed: netOnline, used: usedCommunity().length, ground: evals[idx].ground.status, logLen: log.length, playing: playing, source: source.kind, n: series.length, step: stepMin }) };
   }
   init();
 })();

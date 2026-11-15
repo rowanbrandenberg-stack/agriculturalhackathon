@@ -51,7 +51,12 @@
       <svg id="compass" viewBox="0 0 220 220" role="img" aria-label="Potential downwind direction at each height"></svg>
       <div class="legend"><span class="k lo"></span>5 ft wind <span class="k hi"></span>30 ft wind</div>
       <div class="mini" id="miniStats"></div>
-      <div class="blk"><div class="blkT">Sensitive area proximity</div><svg id="blockMap" viewBox="0 0 212 150" role="img" aria-label="Illustration of where the sensitive site sits relative to the block"></svg><div id="blockTxt" class="blkTxt"></div></div>
+      <div class="blk" hidden><div class="blkT">Sensitive area proximity</div><svg id="blockMap" viewBox="0 0 212 150" role="img" aria-label="Illustration of where the sensitive site sits relative to the block"></svg><div id="blockTxt" class="blkTxt"></div></div>
+      <div class="heatSide"><div class="blkT">Grower report heatmap</div>
+          <svg id="heatMap" viewBox="0 0 320 320" role="img" aria-label="Map of community reports near this block"></svg>
+          <div class="heatleg"><i></i><span>few reports</span><span>many</span></div>
+          <div class="muted small" id="heatState"></div>
+      </div>
     </div>
   </section>
 
@@ -230,11 +235,7 @@
     <summary><b>Grower network</b><span>Community reports near this block</span></summary>
     <div class="secBody">
       <div class="heatwrap">
-        <div>
-          <svg id="heatMap" viewBox="0 0 320 320" role="img" aria-label="Map of community reports near this block"></svg>
-          <div class="heatleg"><i></i><span>few reports</span><span>many</span></div>
-          <div class="muted small" id="heatState"></div>
-        </div>
+        
         <div class="quick">
           <div class="qt">See something? One tap tells growers nearby.</div>
           <button class="qbtn q1" data-kind="inversion">Air not moving<small>smoke or dust hanging flat</small></button>
