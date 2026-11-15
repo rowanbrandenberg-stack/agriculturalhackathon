@@ -3,7 +3,7 @@
   const E = window.SprayEngine, S = window.SpraySim;
   const $ = id => document.getElementById(id);
   const f1 = E.f1;
-  const BUILD = '2026-11-15.8';
+  const BUILD = '2026-11-15.10';
   const LIVE_URL = 'https://rowanbrandenberg-stack.github.io/agriculturalhackathon/';
   const TZ = { name: 'America/Phoenix', offset: '-07:00', abbr: 'MST' };
   const WATCH_HOURS = { low: 1, medium: 4, high: 12 };   // prototype values, confirm with a PCA
@@ -11,17 +11,19 @@
   /* The applicator picks what the PCA already recommended. The tool never recommends a product. Heat limits are prototype values. */
   const PROFILES = {
     custom: { name: 'Custom (set below)', vol: null, heat: null, text: '', note: 'Set volatility yourself from the product label.' },
-    oil: { name: 'Horticultural oil', vol: 'low', heat: 90, text: 'Oil sprays can burn leaves and fruit in heat.', note: 'Low vapor risk. Prototype heat limit 90°F because oil can burn leaves and fruit.' },
+    oil: { name: 'Horticultural or neem oil', vol: 'low', heat: 90, text: 'Oil sprays can burn leaves and fruit in heat.', note: 'Low vapor risk. Prototype heat limit 90°F because oil can burn leaves and fruit.' },
     sulfur: { name: 'Sulfur', vol: 'low', heat: 90, text: 'Sulfur can burn foliage in heat.', note: 'Low vapor risk. Prototype heat limit 90°F because sulfur can burn foliage.' },
+    biofung: { name: 'Organic fungicide (biological)', vol: 'low', heat: null, text: '', note: 'Standard checks apply. Check the label for rain and sunlight limits, which this tool does not measure.' },
     contact: { name: 'Contact insecticide, low volatility', vol: 'low', heat: null, text: '', note: 'Standard checks apply.' },
     volatile: { name: 'Volatile herbicide on the orchard floor', vol: 'high', heat: 85, text: 'Volatile products can give off more vapor in heat.', note: 'High vapor risk. Prototype heat limit 85°F and a 12 hour watch after spraying.' }
   };
   const SITE_SIDE = { 0: 'north', 45: 'northeast', 90: 'east', 135: 'southeast', 180: 'south', 225: 'southwest', 270: 'west', 315: 'northwest' };
-  const CFG_KEYS = ['windMin', 'windMax', 'shearSpeed', 'shearDir', 'volatility', 'heatLimit', 'heatText', 'productName', 'profile', 'siteOn', 'siteName', 'siteBearing', 'jobHours'];
+  const CFG_KEYS = ['windMin', 'windMax', 'shearSpeed', 'shearDir', 'volatility', 'heatLimit', 'heatText', 'productName', 'profile', 'siteOn', 'siteName', 'siteBearing', 'jobHours', 'jobCost'];
 
-  let cfg = Object.assign({}, E.DEFAULT_CFG);
-  try { const sv = JSON.parse(localStorage.getItem('sow_cfg') || 'null'); if (sv) { const c = Object.assign({}, cfg); CFG_KEYS.forEach(k => { if (k in sv) c[k] = sv[k]; }); if (!E.validateCfg(c).length) cfg = c; } } catch (e) {}
+  let cfg = Object.assign({ jobCost: 0 }, E.DEFAULT_CFG);
+  try { const sv = JSON.parse(localStorage.getItem('sow_cfg') || 'null'); if (sv) { const c = Object.assign({}, cfg); CFG_KEYS.forEach(k => { if (k in sv) c[k] = sv[k]; }); if (!E.validateCfg(c).length && num0(c.jobCost)) cfg = c; } } catch (e) {}
 
+  function num0(x) { return typeof x === 'number' && isFinite(x) && x >= 0; }
   let stepMin = S.STEP_MIN;
   let series = simSeries();
   let source = { kind: 'sim' };
@@ -119,6 +121,7 @@
     let nxt = '';
     if (j.state !== 'SUFFICIENT') nxt = j.next ? 'Next projected suitable weather window: ' + fmtTime(series[j.next.start].min) + ' to ' + fmtTime(series[j.next.start].min + j.next.hours * 60) + ' (' + durWords(j.next.hours * 60) + ').'
       : 'No later window of ' + durWords(j.needMin) + ' is projected in this data.';
+    if (cfg.jobCost > 0 && j.state !== 'SUFFICIENT') nxt += ' Product cost you entered for this job: $' + Math.round(cfg.jobCost).toLocaleString('en-US') + '. That is what a wasted application puts at stake.';
     const src = source.kind === 'sim' ? 'Projection source: the remaining samples of a known simulated day. This is a demonstration, not a forecast.' : 'Projection source: later rows of the imported file. This is not a forecast.';
     $('jobStrip').className = 'jobstrip ' + cls;
     $('jobStrip').innerHTML = '<div class="jl"><span class="jk">Current weather</span><span class="pill ' + evals[idx].status + '">' + evals[idx].status + '</span></div>' +
@@ -297,7 +300,8 @@
   }
   function toggleSession() {
     const nowMin = series[idx].min, ev = evals[idx];
-    if (session.state === 'idle') { session = { state: 'spraying', startMin: nowMin, endMin: null, watchUntil: null }; fileRep = null; renderFile(); addLog('SPRAY START' + (ev.status !== 'GO' ? ' (started on ' + ev.status + ')' : '')); }
+    if (session.state === 'idle') { session = { state: 'spraying', startMin: nowMin, endMin: null, watchUntil: null }; fileRep = null; renderFile(); addLog('SPRAY START' + (ev.status !== 'GO' ? ' (started on ' + ev.status + ')' : ''));
+      if ($('optNotify').checked) postReport('spraying', 'Application started'); }
     else if (session.state === 'spraying') { session.state = 'watch'; session.endMin = nowMin; session.watchUntil = nowMin + WATCH_HOURS[cfg.volatility] * 60; addLog('SPRAY END, watch for ' + WATCH_HOURS[cfg.volatility] + ' h'); buildFile(); }
     else { addLog('WATCH ENDED'); session = idle(); }
     renderAll();
@@ -306,6 +310,51 @@
     const ev = log.filter(l => l.event !== 'Reading').slice(0, 5);
     $('recent').innerHTML = ev.length ? ev.map(l => '<li><span class="rt1">' + fmtTime(l.min) + '</span><span class="pill ' + l.status + '">' + l.status + '</span><div><b>' + esc(l.event) + '</b>' + (l.reasons ? '<div class="muted">' + esc(l.reasons) + '</div>' : '') + '</div></li>').join('')
       : '<li class="muted">No alerts yet in this session. Alerts appear here when the weather call changes during playback or monitoring.</li>';
+  }
+
+  /* ---------- what, when, how ---------- */
+  const HOW_SOURCES = [['Ohio State Extension, FABE 535', 'https://ohioline.osu.edu/factsheet/fabe-535'], ['Montana State Extension', 'https://www.montana.edu/extension/pesticides/reference/drift.html'], ['NDSU Extension, AE1246', 'https://ndsu.edu/agriculture/sites/default/files/2024-10/ae1246.pdf'], ['Health Canada', 'https://www.canada.ca/en/health-canada/services/consumer-product-safety/pesticides-pest-management/growers-commercial-users/drift-mitigation/management-pesticide-spray-drift.html']];
+  function renderWWW() {
+    const ev = evals[idx], p = PROFILES[cfg.profile || 'custom'], b = baseEvals(); b[idx] = ev;
+    const j = E.jobAssessment(b, idx, stepMin, cfg.jobHours);
+    $('whatNote').innerHTML = esc(p.note) + ' <b>Rate and amount come from the label and your PCA.</b> This tool does not set them. <a href="#pestSec" class="lnk" data-open="pestSec">Not sure what the pest is? Open the pest guide</a>';
+    let when;
+    if (j.state === 'SUFFICIENT') when = '<b>Now.</b> ' + durWords(j.runMin) + ' of projected suitable weather, enough for this ' + jobWords() + ' job.';
+    else if (j.state === 'UNKNOWN') when = '<b>Unknown.</b> ' + (j.current === 'UNABLE' ? 'The weather cannot be assessed right now.' : 'The data ends before this job would finish.');
+    else when = '<b>Not now.</b> ' + (j.current === 'STOP' ? 'Current weather is STOP.' : j.current === 'CAUTION' ? 'Current weather is CAUTION.' : 'Only ' + durWords(j.runMin) + ' of suitable weather is projected and this job needs ' + durWords(j.needMin) + '.');
+    if (j.state !== 'SUFFICIENT') when += j.next ? ' Next projected suitable window: <b>' + fmtTime(series[j.next.start].min) + ' to ' + fmtTime(series[j.next.start].min + j.next.hours * 60) + '</b>.' : ' No later window of ' + durWords(j.needMin) + ' is projected in this data.';
+    $('whenBox').innerHTML = when;
+    const tips = ['Read the spray drift section of the label first. It sets wind limits, droplet size, release height and buffers.',
+      'Use the coarsest droplets the label allows. Higher pressure makes finer droplets, and finer droplets drift more.',
+      'Match the sprayer air to the canopy. Too much air for the foliage sends spray through and above the trees.'];
+    if (cfg.volatility === 'high') tips.push('Low drift nozzles reduce droplet drift. They do not reduce vapor drift from a volatile product.');
+    let lead = '';
+    if (ev.status === 'STOP') lead = '<b>Changing the setup does not fix a STOP.</b> Wait for the weather.';
+    else if (ev.status === 'UNABLE') lead = '<b>Check the sensors first.</b>';
+    else if (ev.triggers.some(t => t.code === 'SITE_DOWNWIND')) lead = '<b>Measured wind points toward the ' + esc(cfg.siteName) + '.</b> Buffers there are set by the label.';
+    $('howBox').innerHTML = (lead ? '<div>' + lead + '</div>' : '') + '<ul>' + tips.map(t => '<li>' + t + '</li>').join('') + '</ul><div class="wsrc">General practice from ' + HOW_SOURCES.map(s => '<a href="' + s[1] + '" target="_blank" rel="noopener">' + s[0] + '</a>').join(', ') + '. The label and your PCA decide for your product.</div>';
+  }
+
+  /* ---------- neighbor view: a notice for people next to the block, not a drift map ---------- */
+  function renderNeighbor() {
+    const side = +$('nbrSide').value, r = reading(idx), ev = evals[idx], spraying = session.state === 'spraying';
+    const dirLine = (w, d, label) => {
+      if (!num(w)) return ['No valid wind reading at ' + label + '.', null];
+      if (w < cfg.calmMph || !num(d)) return ['Wind at ' + label + ' is near calm. Direction is not reliable.', null];
+      const toward = E.angDiff((d + 180) % 360, side) <= cfg.siteCone;
+      return ['Measured wind at ' + label + ' (' + f1(w) + ' mph from the ' + E.compass(d) + ') points ' + (toward ? 'toward' : 'away from') + ' your side.', toward];
+    };
+    const lo = dirLine(r.wLo, r.dLo, cfg.loLabel), hi = dirLine(r.wHi, r.dHi, cfg.hiLabel), toward = lo[1] === true || hi[1] === true, unknown = lo[1] === null && hi[1] === null;
+    let tag, cls, head;
+    if (spraying && toward) { tag = 'HEADS UP'; cls = 'STOP'; head = 'An application is in progress at this block and measured wind points toward your side.'; }
+    else if (spraying && unknown) { tag = 'HEADS UP'; cls = 'CAUTION'; head = 'An application is in progress at this block. Wind direction cannot be read right now.'; }
+    else if (spraying) { tag = 'IN PROGRESS'; cls = 'CAUTION'; head = 'An application is in progress at this block. Measured wind points away from your side.'; }
+    else { tag = 'NO APPLICATION'; cls = 'GO'; head = 'No application is in progress at this block' + (session.state === 'watch' ? '. The last one ran ' + fmtTime(session.startMin) + ' to ' + fmtTime(session.endMin) + '.' : '.'); }
+    const near = community.filter(c => c.kind === 'spraying' && c.distMi <= 3).length;
+    $('nbrBox').innerHTML = '<div class="nbrHead"><span class="pill ' + cls + '">' + tag + '</span><b>' + esc(head) + '</b></div><ul class="recent">' +
+      '<li><span class="rt1">' + fmtTime(series[idx].min) + '</span><div>' + esc(lo[0]) + '</div></li><li><span class="rt1"></span><div>' + esc(hi[0]) + '</div></li>' +
+      '<li><span class="rt1"></span><div>Weather call at the tower: <span class="pill ' + ev.status + '">' + ev.status + '</span> ' + esc(ev.triggers[0] ? ev.triggers[0].title : ev.problems[0] ? ev.problems[0].text : 'all measured checks pass') + '</div></li>' +
+      '<li><span class="rt1"></span><div>Applications reported within 3 miles in the last 8 hours: ' + near + ' actual report' + (near === 1 ? '' : 's') + '.</div></li></ul>';
   }
 
   /* ---------- record ---------- */
@@ -376,7 +425,7 @@
   }
 
   /* ---------- playback and scenarios ---------- */
-  function renderAll() { renderStatus(); renderJob(); renderTower(); renderCompass(); renderTimeline(); renderSession(); }
+  function renderAll() { renderStatus(); renderJob(); renderTower(); renderCompass(); renderTimeline(); renderSession(); renderNeighbor(); renderWWW(); }
   function stepOnce() { if (idx >= series.length - 1) { if (playing) togglePlay(); return; } idx++; setNow(); checkAlert(); renderAll(); }
   function togglePlay() {
     playing = !playing; $('play').textContent = playing ? 'Pause' : 'Play'; $('play').classList.toggle('playing', playing);
@@ -396,10 +445,10 @@
 
   /* ---------- settings ---------- */
   function fillForm() {
-    $('cfgProf').value = cfg.profile || 'custom'; $('profNote').textContent = PROFILES[cfg.profile || 'custom'].note;
+    $('whatSel').value = cfg.profile || 'custom'; $('cfgProf').value = cfg.profile || 'custom'; $('profNote').textContent = PROFILES[cfg.profile || 'custom'].note;
     $('cfgVol').value = cfg.volatility; $('cfgMin').value = cfg.windMin; $('cfgMax').value = cfg.windMax; $('cfgJob').value = cfg.jobHours;
     $('cfgSiteOn').value = cfg.siteOn ? '1' : '0'; $('cfgSiteName').value = cfg.siteName; $('cfgSiteDir').value = String(cfg.siteBearing);
-    $('cfgShS').value = cfg.shearSpeed; $('cfgShD').value = cfg.shearDir;
+    $('cfgShS').value = cfg.shearSpeed; $('cfgShD').value = cfg.shearDir; $('cfgCost').value = cfg.jobCost || '';
   }
   function readForm() {
     const c = Object.assign({}, cfg), val = id => { const s = $(id).value.trim(); return s === '' ? NaN : Number(s); };
@@ -409,9 +458,10 @@
     c.profile = pk2; c.heatLimit = pr2.heat; c.heatText = pr2.text; c.productName = pk2 === 'custom' ? '' : pr2.name.toLowerCase(); c.volatility = $('cfgVol').value;
     c.windMin = val('cfgMin'); c.windMax = val('cfgMax'); c.jobHours = val('cfgJob'); c.shearSpeed = val('cfgShS'); c.shearDir = val('cfgShD');
     c.siteOn = $('cfgSiteOn').value === '1'; c.siteName = $('cfgSiteName').value.trim() || 'sensitive site'; c.siteBearing = +$('cfgSiteDir').value;
-    const errs = E.validateCfg(c), box = $('cfgErr');
+    const cost = $('cfgCost').value.trim() === '' ? 0 : Number($('cfgCost').value); c.jobCost = cost;
+    const errs = E.validateCfg(c), box = $('cfgErr'); if (!num0(cost)) errs.push('Product cost must be 0 or more.');
     if (errs.length) { box.hidden = false; box.textContent = 'Not applied. ' + errs.join(' ') + ' The previous settings are still active.'; fillForm(); return false; }
-    box.hidden = true; cfg = c; $('profNote').textContent = pr2.note; saveCfg(); applyChange('SETTINGS CHANGED'); if (fcState) renderForecast(); return true;
+    box.hidden = true; cfg = c; $('whatSel').value = cfg.profile; $('profNote').textContent = pr2.note; saveCfg(); applyChange('SETTINGS CHANGED'); if (fcState) renderForecast(); return true;
   }
   function applyChange(evt) { recompute(); setNow(); lastStatus = evals[idx].status; renderRules(); addLog(evt); renderAll(); }
   function renderSource() {
@@ -485,7 +535,7 @@
   const SB = 'https://nuafgtzcyrrvtiligkyl.supabase.co/rest/v1/';
   const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im51YWZndHpjeXJydnRpbGlna3lsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTQ3NTc1NzQsImV4cCI6MjExMDMzMzU3NH0.mhfolpk5bCK2e2lzn8DTLn1TWnjC5p0cLE1RF9YAa8E';
   const SBH = { apikey: SB_KEY, Authorization: 'Bearer ' + SB_KEY, 'Content-Type': 'application/json' };
-  const KIND = { inversion: ['Air not moving', '#b3261e'], drift: ['Drift seen', '#b96a00'], crew: ['Crew in field', '#6d28d9'], spraying: ['Application recorded', '#0b6e99'] };
+  const KIND = { inversion: ['Air not moving', '#b3261e'], drift: ['Drift seen', '#b96a00'], crew: ['Crew in field', '#6d28d9'], spraying: ['Application nearby', '#0b6e99'] };
   let netRows = [], netLocal = [], netOnline = null;
   function blockPos() { return { lat: parseFloat($('lat').value) || 32.69, lon: parseFloat($('lon').value) || -114.62 }; }
   function geo(a, b) {
@@ -654,7 +704,9 @@
     window.addEventListener('pointermove', e => { if (drag) tlPick(e); });
     window.addEventListener('pointerup', () => { drag = false; });
     window.addEventListener('resize', renderTimeline);
-    ['cfgProf', 'cfgVol', 'cfgMin', 'cfgMax', 'cfgJob', 'cfgSiteOn', 'cfgSiteName', 'cfgSiteDir', 'cfgShS', 'cfgShD'].forEach(id => $(id).addEventListener('change', readForm));
+    ['cfgProf', 'cfgVol', 'cfgMin', 'cfgMax', 'cfgJob', 'cfgSiteOn', 'cfgSiteName', 'cfgSiteDir', 'cfgShS', 'cfgShD', 'cfgCost'].forEach(id => $(id).addEventListener('change', readForm));
+    $('nbrSide').onchange = renderNeighbor;
+    $('whatSel').innerHTML = $('cfgProf').innerHTML; $('whatSel').value = cfg.profile || 'custom'; $('whatSel').onchange = () => { $('cfgProf').value = $('whatSel').value; readForm(); };
     $('optDropHi').onchange = () => { dropHi = $('optDropHi').checked; applyChange(dropHi ? 'TEST: 30 ft sensor disconnected' : 'TEST ENDED: 30 ft sensor reconnected'); };
     $('sprayBtn').onclick = toggleSession;
     $('noteBtn').onclick = () => { const v = $('noteIn').value.trim(); if (v) { addLog('NOTE: ' + v); $('noteIn').value = ''; } };
@@ -664,7 +716,7 @@
     $('optPush').onchange = () => { if ($('optPush').checked && 'Notification' in window && Notification.permission !== 'granted') { try { Notification.requestPermission(); } catch (e) {} } };
     $('csvSample').onclick = sampleCsv;
     $('csvIn').onchange = e => { const f = e.target.files[0]; if (!f) return; const fr = new FileReader(); fr.onload = () => loadCsv(String(fr.result), f.name); fr.readAsText(f); e.target.value = ''; };
-    $('resetBtn').onclick = () => { if (playing) togglePlay(); cfg = Object.assign({}, E.DEFAULT_CFG); saveCfg(); series = simSeries(); stepMin = S.STEP_MIN; source = { kind: 'sim' }; dropHi = false; $('optDropHi').checked = false; $('cfgErr').hidden = true;
+    $('resetBtn').onclick = () => { if (playing) togglePlay(); cfg = Object.assign({ jobCost: 0 }, E.DEFAULT_CFG); saveCfg(); series = simSeries(); stepMin = S.STEP_MIN; source = { kind: 'sim' }; dropHi = false; $('optDropHi').checked = false; $('cfgErr').hidden = true;
       fillForm(); renderSource(); recompute(); renderRules(); resetDemo(); if (fcState) renderForecast(); };
     $('fcBtn').onclick = loadForecast;
     $('fcSec').addEventListener('toggle', () => { if ($('fcSec').open && !fcState) loadForecast(); });

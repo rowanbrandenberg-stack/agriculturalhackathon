@@ -10,6 +10,23 @@ Live demo: https://rowanbrandenberg-stack.github.io/agriculturalhackathon/
 
 Applicators usually judge conditions from what they feel at ground level or from one ground weather station. A temperature inversion cannot be seen from the ground, and wind above the trees can be stronger or blowing a different way than wind inside the canopy.
 
+## What, when, how
+
+The main screen answers three questions for the job in front of the applicator.
+
+* **What**: the product they were already told to spray, picked from a short list (horticultural or neem oil, sulfur, organic fungicide, contact insecticide, volatile herbicide, or custom). The choice changes the rules. Rate and amount come from the label and the PCA; this tool does not set them.
+* **When**: now, not now, or unknown, with the next projected suitable weather window.
+* **How**: general drift reduction practice from Extension sources (read the label's drift section, use the coarsest droplets the label allows, match sprayer air to the canopy), with links. The label and the PCA decide for the product.
+
+## What we changed after talking to growers
+
+We showed the prototype to growers at a Tucson farmers market during the hackathon.
+
+* A wasted spray is expensive (one grower pays $800 a quart for organic fungicide concentrate), so the planned job check now shows the product cost you enter when the window is too short.
+* Organic growers told us they move far out to avoid overspray and want to know what happens near their land and water, so there is a **Neighbor view**: whether an application is in progress at the block and which way the measured wind points. Starting a job can send a notice (no name, no product) to the shared report database. It is a notice, not a drift map.
+* Neem oil and organic fungicide were added to the product list, because the growers we met spray those.
+* Not built on purpose: how much to apply (label and PCA), soil health, drift path prediction.
+
 ## What the screen shows
 
 1. **Current weather**: GO, CAUTION, STOP or UNABLE (unable to assess), with every reason in plain language.
@@ -62,7 +79,7 @@ No build step. Open `index.html` in a browser, or serve the folder with any stat
 
 ```
 node tests/engine.test.js      # 64 decision logic checks, no dependencies
-python3 tests/flows.py [url]   # 39 user flow checks in a headless browser (needs Playwright and Chrome)
+python3 tests/flows.py [url]   # 49 user flow checks in a headless browser (needs Playwright and Chrome)
 ```
 
 ## Files

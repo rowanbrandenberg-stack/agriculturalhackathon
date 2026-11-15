@@ -302,3 +302,20 @@ details.sec>summary:hover{background:var(--soft)}
   .rt td{border:0;padding:2px 0}
   .rt tr{border-bottom:1px solid var(--rule);padding:8px 0}
 }
+
+.nbr{margin:10px 0 12px}
+.nbrHead{display:flex;gap:12px;align-items:baseline;flex-wrap:wrap;font-size:16px;margin-bottom:6px}
+
+/* what, when, how */
+.www{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));border-top:1px solid var(--rule)}
+.wcol{padding:16px 26px 18px;min-width:0}
+.wcol+.wcol{border-left:1px solid var(--rule)}
+.wh{font:700 30px/1 var(--display);color:var(--ink);margin:0 0 8px}
+.wlab{display:block;font-size:13px;color:var(--mut);margin-bottom:4px}
+.wcol select{width:100%;margin-bottom:8px}
+.wtxt{font-size:14px;color:#33434f}
+.wtxt ul{margin:6px 0 6px;padding-left:18px}
+.wtxt li{margin-bottom:3px}
+.wsrc{font-size:12px;color:var(--mut)}
+@media (max-width:1100px){.www{grid-template-columns:minmax(0,1fr)}.wcol+.wcol{border-left:0;border-top:1px solid var(--rule)}}
+@media (max-width:640px){.wcol{padding:14px}}
