@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Spray or Wait</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="top">
+  <div class="brand">
+    <svg viewBox="0 0 40 40" width="34" height="34" aria-hidden="true"><rect x="18.5" y="4" width="3" height="32" rx="1.5" fill="currentColor"/><circle cx="20" cy="9" r="5" fill="none" stroke="currentColor" stroke-width="2.5"/><circle cx="20" cy="28" r="5" fill="currentColor"/></svg>
+    <div><div class="name">Spray or Wait</div><div class="tag">Two heights. One clear answer.</div></div>
+  </div>
+  <div class="where">
+    <div id="blockName">Block 7 · Lemons · Yuma County, AZ</div>
+    <div class="src" id="srcLabel">Simulated tower: sensors at 5 ft and 30 ft, reading every 5 min</div>
+  </div>
+  <div class="clock"><div id="clock">6:10 AM</div><div class="src">orchard time</div></div>
+</header>
+
+<div id="alertBar" class="alertbar" hidden></div>
+
+<main>
+  <section class="hero">
+    <div class="status" id="statusCard">
+      <div class="statusrow">
+        <div class="light" id="light"></div>
+        <div>
+          <div class="word" id="statusWord">STOP</div>
+          <div class="action" id="statusAction"></div>
+        </div>
+      </div>
+      <h3>Why</h3>
+      <ul class="reasons" id="reasons"></ul>
+      <div class="ground" id="groundBox">
+        <div class="gtitle">A single ground station would say</div>
+        <div class="gverdict"><span class="pill" id="groundPill">GO</span><span id="groundText"></span></div>
+        <div class="gmiss" id="groundMiss"></div>
+      </div>
+    </div>
+
+    <div class="scene">
+      <svg id="tower" viewBox="0 0 560 330" role="img" aria-label="Orchard cross section with sensors at two heights"></svg>
+      <div class="sceneSide">
+        <svg id="compass" viewBox="0 0 220 220" role="img" aria-label="Where drift would travel"></svg>
+        <div class="legend"><span class="k lo"></span>5 ft wind <span class="k hi"></span>30 ft wind</div>
+        <div class="mini" id="miniStats"></div>
+        <div class="blk"><div class="blkT">WHOLE BLOCK OR PART</div><svg id="blockMap" viewBox="0 0 212 144" role="img" aria-label="Which rows to spray now"></svg><div id="blockTxt" class="blkTxt"></div></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="card timeline">
+    <div class="tlhead">
+      <h2>Today in this block</h2>
+      <div class="controls">
+        <button id="play" class="btn primary">Play</button>
+        <select id="speed" aria-label="Playback speed">
+          <option value="1000">5 min per second</option>
+          <option value="350" selected>15 min per second</option>
+          <option value="120">40 min per second</option>
+        </select>
+        <span class="jumpl">Jump to</span>
+        <button class="btn jump" data-min="370">6:10 AM hidden inversion</button>
+        <button class="btn jump" data-min="660">11:00 AM good window</button>
+        <button class="btn jump" data-min="900">3:00 PM spray, then wind aloft</button>
+        <button class="btn jump" data-min="1075">5:55 PM evening inversion</button>
+      </div>
+    </div>
+    <svg id="tl" viewBox="0 0 1000 300" preserveAspectRatio="none"></svg>
+    <div class="tlfoot" id="tlfoot"></div>
+  </section>
+
+  <section class="grid3">
+    <div class="card">
+      <h2>Next safe window</h2>
+      <div id="windowBox" class="windowBox"></div>
+      <h2 class="mt">Spray session</h2>
+      <div id="sessionBox" class="sessionBox"></div>
+      <div class="row">
+        <button id="sprayBtn" class="btn primary">Start spraying</button>
+      </div>
+      <div class="note">
+        <label for="noteIn">Applicator note (goes in the record)</label>
+        <div class="row"><input id="noteIn" type="text" placeholder="Example: checked smoke bomb, drift moving south"><button id="noteBtn" class="btn">Add</button></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>This job</h2>
+      <div class="form">
+        <label class="wide">What are you spraying (from your PCA recommendation)
+          <select id="cfgProf"><option value="custom">Custom (set below)</option><option value="oil">Horticultural oil</option><option value="sulfur">Sulfur</option><option value="contact">Contact insecticide, low volatility</option><option value="volatile">Volatile herbicide on the orchard floor</option></select>
+          <span id="profNote" class="profNote"></span>
+        </label>
+        <label>Product volatility
+          <select id="cfgVol"><option value="low">Low</option><option value="medium">Medium</option><option value="high">High (vapor can drift after spraying)</option></select>
+        </label>
+        <label>Label wind minimum (mph)<input id="cfgMin" type="number" step="0.5" min="0" max="10"></label>
+        <label>Label wind maximum (mph)<input id="cfgMax" type="number" step="0.5" min="3" max="25"></label>
+        <label>Job length (hours)<input id="cfgJob" type="number" step="0.5" min="0.5" max="12"></label>
+        <label>Sensitive site nearby
+          <select id="cfgSiteOn"><option value="1">Yes</option><option value="0">None</option></select>
+        </label>
+        <label>What is it<input id="cfgSiteName" type="text" maxlength="24"></label>
+        <label>Which side of the block
+          <select id="cfgSiteDir"><option value="0">North</option><option value="45">Northeast</option><option value="90">East</option><option value="135">Southeast</option><option value="180">South</option><option value="225">Southwest</option><option value="270">West</option><option value="315">Northwest</option></select>
+        </label>
+        <label>Speed difference to flag (mph)<input id="cfgShS" type="number" step="0.5" min="1" max="20"></label>
+        <label>Direction difference to flag (degrees)<input id="cfgShD" type="number" step="5" min="10" max="180"></label>
+        <label>Edge rows to hold near a site (of 12)<input id="cfgBuf" type="number" step="1" min="1" max="6"></label>
+      </div>
+      <div class="row wrap">
+        <label class="chk"><input type="checkbox" id="optSound" checked> Sound on alerts</label>
+        <label class="chk"><input type="checkbox" id="optPush"> Push notifications</label>
+      </div>
+      <div class="row wrap">
+        <label class="btn file">Load tower CSV<input id="csvIn" type="file" accept=".csv,text/csv" hidden></label>
+        <button id="csvSample" class="btn">Download sample CSV</button>
+        <button id="resetBtn" class="btn">Reset</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Real forecast outlook, next 72 hours</h2>
+      <div class="row">
+        <input id="lat" type="number" step="0.01" aria-label="Latitude" value="32.69">
+        <input id="lon" type="number" step="0.01" aria-label="Longitude" value="-114.62">
+        <button id="fcBtn" class="btn">Load</button>
+      </div>
+      <div id="fcBox" class="fcBox"><div class="muted">Loading forecast…</div></div>
+      <div class="muted small">Planning only. Weather model values near the ground and about 260 ft up (Open-Meteo). A model is coarser than a tower in the block, which is why the live call above uses the tower.</div>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="tlhead"><h2>Arizona citrus pest guide</h2>
+      <div class="controls"><label class="chk">What did scouting find <select id="pestSel"></select></label></div></div>
+    <div class="pest" id="pestBox"></div>
+    <div class="muted small">Paraphrased from University of Arizona Cooperative Extension and UC IPM. A reference for the conversation with your PCA, not a prescription. The PCA writes the recommendation and the label is the law.</div>
+  </section>
+
+  <section class="card">
+    <div class="tlhead"><h2>Grower network</h2><div class="muted small" id="netState">Connecting…</div></div>
+    <div class="net">
+      <svg id="netMap" viewBox="0 0 240 240" role="img" aria-label="Reports near this block"></svg>
+      <div>
+        <h3 class="h3top">What growers nearby are reporting</h3>
+        <ul id="netFeed" class="feed"></ul>
+      </div>
+      <div class="repform">
+        <h3 class="h3top">Report from the field</h3>
+        <label>What do you see
+          <select id="repKind"><option value="inversion">Inversion signs (smoke or dust hanging flat, ground fog)</option><option value="drift">I saw spray drift</option><option value="crew">Crew working in the field</option><option value="spraying">I am spraying now</option></select>
+        </label>
+        <div class="row">
+          <label>Where<select id="repDist"><option value="0">At my block</option><option value="0.5" selected>0.5 mi away</option><option value="1">1 mi away</option><option value="2">2 mi away</option></select></label>
+          <label>Direction<select id="repDir"><option value="0">North</option><option value="90" selected>East</option><option value="180">South</option><option value="270">West</option></select></label>
+        </div>
+        <label>Note (optional)<input id="repNote" type="text" maxlength="140" placeholder="Example: dust from the road is hanging flat"></label>
+        <div class="row"><button id="repBtn" class="btn primary">Share report</button><span id="repMsg" class="muted small"></span></div>
+        <div class="muted small">No names and no products. Location is rounded to about 300 ft and reports expire after 48 hours. Reports are unverified, so they can only add caution. They never turn a STOP into a GO.</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="tlhead">
+      <h2>Spray record</h2>
+      <div class="controls">
+        <label class="chk"><input type="checkbox" id="logAlerts"> Alerts and events only</label>
+        <button id="logCsv" class="btn">Export CSV</button>
+        <button id="logClear" class="btn">Clear</button>
+      </div>
+    </div>
+    <div class="logwrap">
+      <table id="log"><thead><tr>
+        <th>Time</th><th>Event</th><th>Status</th><th>Ground only</th><th>5 ft °F</th><th>30 ft °F</th><th>Diff</th><th>5 ft wind</th><th>30 ft wind</th><th>What triggered it</th>
+      </tr></thead><tbody></tbody></table>
+    </div>
+  </section>
+
+  <footer>
+    Spray or Wait supports the applicator's decision. It does not replace the pesticide label, on site checks or regulations, and no system can guarantee zero drift. Wind limits of 3 to 10 mph are common guidance and every limit here can be set to match the label. Tower data in this demo is simulated.
+  </footer>
+</main>
+<script src="engine.js"></script>
+<script src="sim.js"></script>
+<script src="pests.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
