@@ -36,7 +36,7 @@ Other features:
 
 * **Arizona citrus pest guide.** For the main Arizona citrus pests: when they matter, how to scout, the action threshold, the options University of Arizona Extension lists, and how to keep the grove's natural enemies working. One click sets the matching spray profile. It is a sourced reference for the PCA conversation, not a prescription.
 
-* **Report filed for you.** When a spray job ends, the app fills in an application report from the tower record (time of application, wind direction and speed at both heights, temperature, product type, the tower's call during the job). One tap sends it. The fields match what Arizona's Form 1080 asks for. In this demo it does not file with the state.
+* **Sign your report.** When a spray job ends, the app fills in an application report from the tower record (time of application, wind direction and speed at both heights, temperature, product type, the tower's call during the job). The applicator types their name, signs on screen, and it is filed to the Spray or Wait record, shared with no name to the grower network, and can be printed or saved as a signed PDF. The fields match what Arizona's Form 1080 asks for. Sending to the state's Form 1080 portal is the next step and is not connected in this demo.
 * **Grower heatmap.** A map of where growers nearby are reporting risk, built from the shared database, with one tap report buttons. The demo adds clearly labeled sample reports so the map is not empty.
 * **Simple main screen.** Status, picture, timeline, spray and report, heatmap. Everything else sits behind Show details.
 
@@ -55,6 +55,10 @@ No build step. Open `index.html` in a browser, or serve the folder with any stat
 ## Honest limits
 
 Spray or Wait supports the applicator's decision. It does not replace the pesticide label, on site checks or regulations, and no system can guarantee zero drift. The tower data in the demo is simulated. Shear thresholds and after spray watch times are starting values to be confirmed with a PCA and the product label.
+
+## Fonts
+
+Barlow Condensed and IBM Plex Sans, both under the SIL Open Font License, bundled in `fonts/` so the app works offline.
 
 ## How it was built
 

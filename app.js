@@ -105,13 +105,13 @@
     h += '<rect x="0" y="0" width="560" height="330" fill="url(#sk)"/>';
     if (inv) {
       h += '<rect x="0" y="56" width="560" height="62" fill="#e8590c" opacity="' + Math.min(0.5, 0.18 + ev.dT * 0.05) + '"/>';
-      h += '<text x="14" y="50" font-size="12" font-weight="700" fill="' + ink + '">WARMER AIR ABOVE ACTS LIKE A LID</text>';
+      h += '<text x="14" y="50" font-size="13" font-weight="600" fill="' + ink + '">Warmer air above acts like a lid</text>';
       h += '<path d="M0,200 C90,186 180,214 280,198 S470,188 560,204 L560,275 L0,275 z" fill="#9aa3ad" opacity="0.5"/>';
     } else if (!near) {
       [90, 205, 470].forEach(x => { h += '<path d="M' + x + ',150 C' + (x - 14) + ',125 ' + (x + 14) + ',105 ' + x + ',72" fill="none" stroke="#4b7f9c" stroke-width="3" stroke-dasharray="6 5" marker-end="url(#ahU)" opacity=".8"/>'; });
-      h += '<text x="14" y="50" font-size="12" font-weight="700" fill="' + ink + '">AIR IS MIXING UPWARD</text>';
+      h += '<text x="14" y="50" font-size="13" font-weight="600" fill="' + ink + '">Air is mixing upward</text>';
     } else {
-      h += '<text x="14" y="50" font-size="12" font-weight="700" fill="' + ink + '">AIR IS BARELY MIXING</text>';
+      h += '<text x="14" y="50" font-size="13" font-weight="600" fill="' + ink + '">Air is barely mixing</text>';
     }
     h += '<rect x="0" y="' + gY + '" width="560" height="55" fill="#6b5a3c"/><rect x="0" y="' + gY + '" width="560" height="7" fill="#5c7a3a"/>';
     [58, 168, 410, 512].forEach(x => {
@@ -126,12 +126,12 @@
       s += '<line x1="' + (mast - 16 - len) + '" y1="' + y + '" x2="' + (mast - 16) + '" y2="' + y + '" stroke="' + col + '" stroke-width="5" stroke-linecap="round" marker-end="url(#' + mk + ')"/>';
       s += '<rect x="' + (mast + 16) + '" y="' + (y - 21) + '" width="246" height="42" rx="8" fill="#fff" opacity=".95" stroke="' + col + '" stroke-width="2"/>';
       s += '<text x="' + (mast + 26) + '" y="' + (y - 4) + '" font-size="12" font-weight="700" fill="' + col + '">' + label + '</text>';
-      s += '<text x="' + (mast + 26) + '" y="' + (y + 14) + '" font-size="15" font-weight="800" fill="#17201b">' + f1(t) + '°F · ' + f1(w) + ' mph from ' + E.compass(d) + '</text>';
+      s += '<text x="' + (mast + 26) + '" y="' + (y + 14) + '" font-size="15" font-weight="800" fill="#17201b">' + f1(t) + '°F,  ' + f1(w) + ' mph from ' + E.compass(d) + '</text>';
       return s;
     }
-    if (inv) h += '<text x="14" y="302" font-size="12" font-weight="700" fill="#f4f1e6">COOL AIR AND SPRAY STAY TRAPPED UNDER THE LID</text>';
-    h += sensor(yHi, '#c2410c', 'SENSOR AT ' + cfg.hiLabel.toUpperCase() + ' (above the canopy)', r.tHi, r.wHi, r.dHi, 'ahH');
-    h += sensor(yLo, '#0b6e99', 'SENSOR AT ' + cfg.loLabel.toUpperCase() + ' (ground station height)', r.tLo, r.wLo, r.dLo, 'ahL');
+    if (inv) h += '<text x="14" y="302" font-size="12" font-weight="700" fill="#f4f1e6">Cool air and spray stay trapped under the lid</text>';
+    h += sensor(yHi, '#c2410c', 'Sensor at ' + cfg.hiLabel + ', above the canopy', r.tHi, r.wHi, r.dHi, 'ahH');
+    h += sensor(yLo, '#0b6e99', 'Sensor at ' + cfg.loLabel + ', ground station height', r.tLo, r.wLo, r.dLo, 'ahL');
     const dtTxt = ev.dT > 0 ? f1(ev.dT) + '°F warmer up top' : f1(-ev.dT) + '°F cooler up top';
     h += '<rect x="352" y="8" width="200" height="30" rx="15" fill="' + (inv ? '#b3261e' : near ? '#b96a00' : '#1c7c3c') + '"/>';
     h += '<text x="452" y="28" text-anchor="middle" font-size="14" font-weight="800" fill="#fff">' + dtTxt + '</text>';
@@ -144,8 +144,8 @@
     const cx = 110, cy = 122, R = 76;
     const pt = (deg, rad) => [cx + rad * Math.sin(deg * Math.PI / 180), cy - rad * Math.cos(deg * Math.PI / 180)];
     let h = '<defs><marker id="cL" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#0b6e99"/></marker><marker id="cH" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#c2410c"/></marker></defs>';
-    h += '<text x="110" y="14" text-anchor="middle" font-size="12" font-weight="800" fill="#1f3d2b" letter-spacing="1">WHERE DRIFT WOULD GO</text>';
-    h += '<circle cx="' + cx + '" cy="' + cy + '" r="' + R + '" fill="#f6f3ea" stroke="#b9b3a3" stroke-width="1.5"/>';
+    h += '<text x="110" y="14" text-anchor="middle" font-size="12" font-weight="600" fill="#15212a">Where drift would go</text>';
+    h += '<circle cx="' + cx + '" cy="' + cy + '" r="' + R + '" fill="#f3f5f6" stroke="#b9b3a3" stroke-width="1.5"/>';
     if (cfg.siteOn) {
       const a = pt(cfg.siteBearing - cfg.siteCone, R), b = pt(cfg.siteBearing + cfg.siteCone, R);
       h += '<path d="M' + cx + ',' + cy + ' L' + a[0] + ',' + a[1] + ' A' + R + ',' + R + ' 0 0 1 ' + b[0] + ',' + b[1] + ' z" fill="#b3261e" opacity=".13"/>';
@@ -176,7 +176,7 @@
   /* ---------- whole block or part of it ---------- */
   function renderBlock(ev) {
     const N = 12, x0 = 40, y0 = 6, cell = 11, plan = ev.plan; let held = 0, h = '';
-    h += '<rect x="' + (x0 - 4) + '" y="' + (y0 - 4) + '" width="' + (N * cell + 8) + '" height="' + (N * cell + 8) + '" rx="6" fill="#efe9da" stroke="#b9b3a3"/>';
+    h += '<rect x="' + (x0 - 4) + '" y="' + (y0 - 4) + '" width="' + (N * cell + 8) + '" height="' + (N * cell + 8) + '" rx="6" fill="#f3f5f6" stroke="#b9b3a3"/>';
     for (let i = 0; i < N; i++) for (let j = 0; j < N; j++) {
       const cx = (i + 0.5) / N * 2 - 1, cy = (j + 0.5) / N * 2 - 1; let hold = plan.mode === 'none';
       if (plan.mode === 'partial') plan.holds.forEach(s => { const ux = Math.sin(s.bearing * Math.PI / 180), uy = -Math.cos(s.bearing * Math.PI / 180); if (cx * ux + cy * uy > Math.abs(ux) + Math.abs(uy) - cfg.bufferRows * 2 / N) hold = true; });
@@ -536,22 +536,45 @@
     const f = fileRep, w = r => f1(r.wLo) + ' mph from ' + E.compass(r.dLo) + ' at 5 ft, ' + f1(r.wHi) + ' mph from ' + E.compass(r.dHi) + ' at 30 ft';
     return [['Block', $('blockName').textContent], ['Date applied', stamp(f.start).slice(0, 10)], ['Time of application', fmtTime(f.start) + ' to ' + fmtTime(f.end)],
       ['Wind at start', w(f.rs)], ['Wind at finish', w(f.re)], ['Temperature', f1(f.rs.tLo) + '°F at 5 ft, ' + f1(f.rs.tHi) + '°F at 30 ft'],
-      ['Product type', f.product], ['Tower call during the job', f.worst + (f.alerts ? ', ' + f.alerts + ' alert' + (f.alerts > 1 ? 's' : '') : ', no alerts')]];
+      ['Product type', cfg.profile && cfg.profile !== 'custom' ? f.product : 'Not set'], ['Tower call during the job', f.worst + (f.alerts ? ', ' + f.alerts + ' alert' + (f.alerts > 1 ? 's' : '') : ', no alerts')]];
   }
   function renderFile() {
     const box = $('fileBox');
-    if (!fileRep) { box.innerHTML = '<div class="muted">When you finish, your required application report is filled in from the tower record. One tap sends it.</div>'; return; }
-    let h = '<table class="ft">' + fileText().map(r => '<tr><th>' + r[0] + '</th><td>' + esc(r[1]) + '</td></tr>').join('') + '</table>';
-    if (fileRep.filed) h += '<div class="filed"><b>Sent for you.</b> Confirmation ' + fileRep.filed + '. Your conditions were also shared, with no name, to sharpen the call for growers nearby.</div>';
-    else h += '<button id="fileBtn" class="btn primary big">Send my report</button>';
-    h += '<div class="row"><button id="fileDl" class="btn">Download a copy</button></div>';
-    h += '<div class="muted small">Fills in the time of application and wind direction and speed that Arizona Form 1080 asks for. Demo: it does not file with the state yet.</div>';
+    if (!fileRep) { box.innerHTML = '<div class="muted">When you finish, your application report is filled in from the tower record. You sign it and it is filed.</div>'; return; }
+    const rows = fileText().map(r => '<tr><th>' + r[0] + '</th><td>' + esc(r[1]) + '</td></tr>').join('');
+    let h = '<table class="ft">' + rows + '</table>';
+    if (fileRep.filed) {
+      h += '<div class="filed"><b>Signed and filed.</b> Reference ' + fileRep.filed + '.<br>Signed by ' + esc(fileRep.signer) + ' at ' + fileRep.signedAt + '.<img class="signimg" alt="Signature" src="' + fileRep.sig + '"></div>';
+      h += '<div class="row"><button id="filePrint" class="btn primary">Print or save as PDF</button><button id="fileDl" class="btn">Download text copy</button></div>';
+      h += '<div class="muted small">Filed to your Spray or Wait record and shared, with no name, with growers nearby. Sending to the Arizona Department of Agriculture Form 1080 portal is the next step and is not connected in this demo.</div>';
+    } else {
+      h += '<div class="sign"><label for="signName">Applicator name</label><input id="signName" type="text" autocomplete="name" style="width:100%" value="' + esc(fileRep.signer || '') + '"></div>';
+      h += '<div class="sign"><label>Sign here</label><div class="signpad"><canvas id="signPad"></canvas><div class="line"></div><div class="hint">Draw with a finger or the mouse</div></div></div>';
+      h += '<button id="fileBtn" class="btn primary big" disabled>Sign and file</button>';
+      h += '<div class="row"><button id="signClear" class="btn">Clear signature</button></div>';
+    }
     box.innerHTML = h;
-    const fb = $('fileBtn'); if (fb) fb.onclick = async () => { fb.disabled = true; fb.textContent = 'Sending…';
+    if (fileRep.filed) {
+      $('filePrint').onclick = () => { $('printDoc').innerHTML = '<h1>Pesticide application report</h1><div>Weather and timing record for Arizona Form 1080, generated by Spray or Wait</div><table>' + rows +
+        '<tr><th>Reference</th><td>' + fileRep.filed + '</td></tr><tr><th>Signed by</th><td>' + esc(fileRep.signer) + ', ' + fileRep.signedAt + '</td></tr></table><img alt="Signature" style="height:80px" src="' + fileRep.sig + '"><p>Tower readings in this demonstration are simulated. This record supports, and does not replace, the official Form 1080.</p>'; window.print(); };
+      $('fileDl').onclick = () => download('application_report_' + stamp(fileRep.start).slice(0, 10) + '.txt', 'SPRAY OR WAIT: APPLICATION REPORT\n\n' + fileText().map(r => r[0] + ': ' + r[1]).join('\n') + '\nReference: ' + fileRep.filed + '\nSigned by: ' + fileRep.signer + ', ' + fileRep.signedAt + '\n');
+      return;
+    }
+    const cv = $('signPad'), ctx = cv.getContext('2d'); let drawing = false, inked = false;
+    const fit = () => { const r = cv.getBoundingClientRect(); cv.width = Math.max(10, r.width) * 2; cv.height = Math.max(10, r.height) * 2; ctx.scale(2, 2); ctx.lineWidth = 2.2; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.strokeStyle = '#15212a'; };
+    fit();
+    const pos = ev => { const r = cv.getBoundingClientRect(); return [ev.clientX - r.left, ev.clientY - r.top]; };
+    const ready = () => { $('fileBtn').disabled = !(inked && $('signName').value.trim().length > 1); };
+    cv.addEventListener('pointerdown', ev => { drawing = true; cv.setPointerCapture(ev.pointerId); const p = pos(ev); ctx.beginPath(); ctx.moveTo(p[0], p[1]); ev.preventDefault(); });
+    cv.addEventListener('pointermove', ev => { if (!drawing) return; const p = pos(ev); ctx.lineTo(p[0], p[1]); ctx.stroke(); inked = true; ready(); });
+    cv.addEventListener('pointerup', () => { drawing = false; });
+    $('signName').addEventListener('input', () => { fileRep.signer = $('signName').value; ready(); });
+    $('signClear').onclick = () => { ctx.clearRect(0, 0, cv.width, cv.height); inked = false; ready(); };
+    $('fileBtn').onclick = async () => { const fb = $('fileBtn'); fb.disabled = true; fb.textContent = 'Filing…';
+      fileRep.sig = cv.toDataURL('image/png'); fileRep.signer = $('signName').value.trim(); fileRep.signedAt = new Date().toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' });
       await postReport('spraying', 0, 0, 'Application report. Tower call during job: ' + fileRep.worst);
-      fileRep.filed = 'SOW ' + stamp(fileRep.start).slice(5, 10).replace('-', '') + ' ' + String(Math.floor(1000 + Math.random() * 9000)) + ' (demo)';
-      addLog('APPLICATION REPORT SENT ' + fileRep.filed); renderFile(); };
-    $('fileDl').onclick = () => download('application_report_' + stamp(fileRep.start).slice(0, 10) + '.txt', 'SPRAY OR WAIT: APPLICATION REPORT\n\n' + fileText().map(r => r[0] + ': ' + r[1]).join('\n') + (fileRep.filed ? '\nConfirmation: ' + fileRep.filed : '') + '\n');
+      fileRep.filed = 'SOW ' + stamp(fileRep.start).slice(5, 10).replace('-', '') + ' ' + String(Math.floor(1000 + Math.random() * 9000));
+      addLog('APPLICATION REPORT SIGNED AND FILED ' + fileRep.filed + ' by ' + fileRep.signer); renderFile(); };
   }
 
   /* ---------- grower heatmap ---------- */
@@ -563,7 +586,7 @@
     const S = 320, N = 20, span = 3, px = m => S / 2 + m / span * (S / 2), py = m => S / 2 - m / span * (S / 2), W = { drift: 3, inversion: 2, crew: 1.2, spraying: 1 };
     const real = community.filter(c => c.distMi <= span * 1.3).map(c => ({ kind: c.kind, dx: c.distMi * Math.sin(c.bearing * Math.PI / 180), dy: c.distMi * Math.cos(c.bearing * Math.PI / 180), ageMin: c.ageMin, real: true }));
     const pts = real.concat(SAMPLE);
-    let h = '<defs><clipPath id="hc"><rect x="0" y="0" width="' + S + '" height="' + S + '" rx="14"/></clipPath></defs><g clip-path="url(#hc)"><rect width="' + S + '" height="' + S + '" fill="#e9e4d4"/>';
+    let h = '<defs><clipPath id="hc"><rect x="0" y="0" width="' + S + '" height="' + S + '" rx="14"/></clipPath></defs><g clip-path="url(#hc)"><rect width="' + S + '" height="' + S + '" fill="#e6eae8"/>';
     let q = 5; const r2 = () => (q = (q * 16807) % 2147483647) / 2147483647;           // patchwork of fields so it reads as a map
     for (let i = 0; i < 6; i++) for (let j = 0; j < 6; j++) h += '<rect x="' + (i * S / 6 + 1.5) + '" y="' + (j * S / 6 + 1.5) + '" width="' + (S / 6 - 3) + '" height="' + (S / 6 - 3) + '" rx="3" fill="' + ['#d7e0bf', '#cddab0', '#e2dcc0', '#d3ddb8'][Math.floor(r2() * 4)] + '"/>';
     const cell = S / N; let vmax = 0; const vals = [];
@@ -575,14 +598,14 @@
     [1, 2, 3].forEach(m => { h += '<circle cx="' + S / 2 + '" cy="' + S / 2 + '" r="' + (m / span * S / 2) + '" fill="none" stroke="#17201b" stroke-opacity=".28" stroke-dasharray="3 5"/><text x="' + (S / 2 + 4) + '" y="' + (S / 2 - m / span * S / 2 + 12) + '" font-size="9" fill="#17201b" opacity=".6">' + m + ' mi</text>'; });
     real.forEach(p => { h += '<circle cx="' + px(p.dx) + '" cy="' + py(p.dy) + '" r="6" fill="' + KIND[p.kind][1] + '" stroke="#fff" stroke-width="2"/>'; });
     if (cfg.siteOn) { const sx = px(0.45 * Math.sin(cfg.siteBearing * Math.PI / 180)), sy = py(0.45 * Math.cos(cfg.siteBearing * Math.PI / 180)); h += '<circle cx="' + sx + '" cy="' + sy + '" r="5" fill="#b3261e" stroke="#fff" stroke-width="1.5"/><text x="' + (sx + 8) + '" y="' + (sy + 4) + '" font-size="10" font-weight="800" fill="#b3261e">' + esc(cfg.siteName) + '</text>'; }
-    h += '<rect x="' + (S / 2 - 9) + '" y="' + (S / 2 - 9) + '" width="18" height="18" rx="4" fill="#1f3d2b" stroke="#fff" stroke-width="2"/><text x="' + S / 2 + '" y="' + (S / 2 + 24) + '" text-anchor="middle" font-size="10" font-weight="800" fill="#1f3d2b">YOU</text>';
+    h += '<rect x="' + (S / 2 - 9) + '" y="' + (S / 2 - 9) + '" width="18" height="18" rx="4" fill="#1f3d2b" stroke="#fff" stroke-width="2"/><text x="' + S / 2 + '" y="' + (S / 2 + 24) + '" text-anchor="middle" font-size="10" font-weight="800" fill="#1f3d2b">You</text>';
     h += '<text x="' + S / 2 + '" y="14" text-anchor="middle" font-size="11" font-weight="800" fill="#17201b">N</text></g>';
     $('heatMap').innerHTML = h;
     $('heatState').textContent = (netOnline ? real.length + ' live report' + (real.length === 1 ? '' : 's') + ' nearby' : 'Offline') + ' + sample reports for the demo';
   }
   function renderNetwork() {
     const cx = 120, cy = 120, R = 100, me = community;
-    let h = '<circle cx="' + cx + '" cy="' + cy + '" r="' + R + '" fill="#f6f3ea" stroke="#b9b3a3"/>';
+    let h = '<circle cx="' + cx + '" cy="' + cy + '" r="' + R + '" fill="#f3f5f6" stroke="#b9b3a3"/>';
     [1, 2].forEach(m => { h += '<circle cx="' + cx + '" cy="' + cy + '" r="' + (R * m / 3) + '" fill="none" stroke="#b9b3a3" stroke-dasharray="3 4"/>'; });
     h += '<text x="' + (cx + 4) + '" y="' + (cy - R / 3 + 12) + '" font-size="9" fill="#5d665f">1 mi</text><text x="' + (cx + 4) + '" y="' + (cy - 2 * R / 3 + 12) + '" font-size="9" fill="#5d665f">2 mi</text><text x="' + (cx + 4) + '" y="' + (cy - R + 12) + '" font-size="9" fill="#5d665f">3 mi</text>';
     h += '<text x="' + cx + '" y="12" text-anchor="middle" font-size="11" font-weight="700" fill="#5d665f">N</text>';
@@ -592,7 +615,7 @@
     $('netMap').innerHTML = h;
     const using = new Set(evals[idx].triggers.filter(t => /^NET_/.test(t.code)).map(t => ({ NET_INVERSION: 'inversion', NET_DRIFT: 'drift', NET_CREW: 'crew' }[t.code])));
     let f = '';
-    me.slice(0, 12).forEach(c => { f += '<li><span class="dot" style="background:' + KIND[c.kind][1] + '"></span><div><b>' + KIND[c.kind][0] + '</b> ' + (c.distMi < 0.15 ? 'at this block' : f1(c.distMi) + ' mi ' + E.compass(c.bearing)) + ' · ' + (c.ageMin < 1 ? 'just now' : c.ageMin < 60 ? Math.round(c.ageMin) + ' min ago' : f1(c.ageMin / 60) + ' h ago') + (using.has(c.kind) ? ' <span class="used">changing your call</span>' : '') + (c.note ? '<div class="nt">' + esc(c.note) + '</div>' : '') + '</div></li>'; });
+    me.slice(0, 12).forEach(c => { f += '<li><span class="dot" style="background:' + KIND[c.kind][1] + '"></span><div><b>' + KIND[c.kind][0] + '</b> ' + (c.distMi < 0.15 ? 'at this block' : f1(c.distMi) + ' mi ' + E.compass(c.bearing)) + ', ' + (c.ageMin < 1 ? 'just now' : c.ageMin < 60 ? Math.round(c.ageMin) + ' min ago' : f1(c.ageMin / 60) + ' h ago') + (using.has(c.kind) ? ' <span class="used">changing your call</span>' : '') + (c.note ? '<div class="nt">' + esc(c.note) + '</div>' : '') + '</div></li>'; });
     $('netFeed').innerHTML = f || '<li class="muted">No reports within 5 miles in the last 8 hours.</li>';
     renderHeat();
     $('netState').textContent = netOnline === null ? 'Connecting…' : netOnline ? 'Live. Shared database, ' + me.length + ' recent report' + (me.length === 1 ? '' : 's') + ' nearby.' : 'Offline. Showing reports made on this device only.';
