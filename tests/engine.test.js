@@ -133,6 +133,12 @@ t('network says inversion, farm model does not: CAUTION', nk.status === 'CAUTION
 t('network and farm both say no inversion: GO', ev({}, { nearby: { inv: 0, of: 5, km: 5, net: { v: -2, sd: 0.5, n: 24 } } }).status === 'GO');
 t('farm inversion stays STOP whatever the network says', ev({ tHi: 75 }, { nearby: { inv: 0, of: 5, km: 5, net: { v: -2, sd: 0.5, n: 24 } } }).status === 'STOP');
 
+console.log('Savings estimate');
+const sv = E.savings({ acres: 40, costPerAcre: 20, jobs: 12, badPct: 15, lostPct: 50, towerYear: 1900 });
+t('savings: 40 acres at $20 is an $800 job, 0.9 lost jobs, $720 avoidable, $1,180 behind', sv.jobCost === 800 && Math.abs(sv.lostJobs - 0.9) < 1e-9 && Math.abs(sv.avoidable - 720) < 1e-9 && Math.abs(sv.net + 1180) < 1e-9, JSON.stringify(sv));
+t('savings: break even is tower cost divided by job cost', Math.abs(sv.breakEvenJobs - 2.375) < 1e-9);
+t('savings: bad input gives no answer instead of a number', E.savings({ acres: 40, costPerAcre: -1, jobs: 12, badPct: 15, lostPct: 50, towerYear: 1900 }) === null && E.savings({ acres: 40, costPerAcre: 20, jobs: 12, badPct: 150, lostPct: 50, towerYear: 1900 }) === null);
+
 console.log('Crop, pest and chemical reference');
 global.window = {}; require('../pests.js');
 const PP = window.SprayPests, CC = window.SprayCrops, KK = window.SprayChems;

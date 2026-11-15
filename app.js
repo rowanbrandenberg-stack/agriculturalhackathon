@@ -3,7 +3,7 @@
   const E = window.SprayEngine, S = window.SpraySim;
   const $ = id => document.getElementById(id);
   const f1 = E.f1;
-  const BUILD = '2026-11-15.15';
+  const BUILD = '2026-11-15.16';
   /* Live mode: a real location, real model weather. Rounded coordinates for the area, not the farm's address. No tower is installed there. */
   const FARM = { name: 'SouthWinds Farm area', place: 'near Benson, Arizona', lat: 31.97, lon: -110.29 };
   const BLOCK_SIM = 'Block 7, lemons, Yuma County, Arizona';
@@ -749,6 +749,24 @@
           (use.length ? use.length + (use.length > 1 ? ' pests' : ' pest') + ' on ' + esc(crops.join(', ')) + '<div class="muted small">' + esc(use.map(p => p.name.split(':')[0]).join('; ')) + '</div>' : (c.note ? esc(c.note) + ' <a href="' + c.src + '" target="_blank" rel="noopener">UA source</a>' : 'None yet')) + '</td></tr>'; }).join('') + '</tbody>';
   }
 
+  function renderRefTables() {   // aggregate views of the same database the pickers use
+    const cn = id => CROPS.find(c => c.id === id).name, link = s => '<a href="' + s[1] + '" target="_blank" rel="noopener">' + esc(s[0]) + '</a>';
+    $('cropT').innerHTML = '<thead><tr><th>Crop</th><th>Pests listed</th><th>Active ingredients listed</th><th>University of Arizona sources</th></tr></thead><tbody>' + CROPS.map(c => {
+      const ps = PESTS.filter(p => p.crops.indexOf(c.id) >= 0), ch = Array.from(new Set([].concat.apply([], ps.map(p => p.chems)))).map(id => chemById(id).name);
+      const seen = {}, srcs = ps.map(p => p.src).filter(s => seen[s[1]] ? false : (seen[s[1]] = true));
+      return '<tr><td><b>' + esc(c.name) + '</b></td><td>' + (ps.length ? ps.length + '<div class="muted small">' + esc(ps.map(p => p.name.split(':')[0]).join('; ')) + '</div>' : 'None yet') + '</td><td>' + (ch.length ? esc(ch.join(', ')) : 'None listed') + '</td><td>' + (srcs.length ? srcs.map(link).join('<br>') : (c.more ? link(c.more) : '')) + '</td></tr>'; }).join('') + '</tbody>';
+    $('pestT').innerHTML = '<thead><tr><th>Pest</th><th>Crops</th><th>When</th><th>Active ingredients listed</th><th>Source</th></tr></thead><tbody>' + PESTS.map(p =>
+      '<tr><td><b>' + esc(p.name) + '</b></td><td>' + esc(p.crops.map(cn).join(', ')) + '</td><td>' + esc(p.when) + '</td><td>' + (p.chems.length ? esc(p.chems.map(id => chemById(id).name).join(', ')) : 'For your PCA') + '</td><td>' + link(p.src) + '</td></tr>').join('') + '</tbody>';
+  }
+  function renderSavings() {
+    const v = id => parseFloat($(id).value), s = E.savings({ acres: v('svAcres'), costPerAcre: v('svCost'), jobs: v('svJobs'), badPct: v('svBad'), lostPct: v('svLost'), towerYear: v('svTower') });
+    const usd = x => '$' + Math.round(x).toLocaleString('en-US');
+    if (!s) { $('svOut').innerHTML = '<b>Enter a number in every box.</b> Percentages run from 0 to 100.'; return; }
+    $('svOut').innerHTML = '<div><span>One job costs</span><b>' + usd(s.jobCost) + '</b></div><div><span>Jobs lost or redone per season</span><b>' + f1(s.lostJobs) + '</b></div><div><span>Cost you could avoid per season</span><b>' + usd(s.avoidable) + '</b></div>' +
+      '<div><span>After the tower cost</span><b class="' + (s.net >= 0 ? 'kok' : 'kbad') + '">' + (s.net >= 0 ? usd(s.net) + ' ahead' : usd(-s.net) + ' behind') + '</b></div>' +
+      '<div><span>Break even</span><b>' + (s.breakEvenJobs == null ? 'n/a' : f1(s.breakEvenJobs) + ' saved jobs a year') + '</b></div>';
+  }
+
   /* ---------- waitlist and QR ---------- */
   async function joinWaitlist() {
     const email = $('wlEmail').value.trim().toLowerCase(), msg = $('wlMsg');
@@ -894,7 +912,8 @@
     $('cropSel').onchange = setCrop;
     $('pestPick').onchange = () => { if ($('pestPick').value) { $('pestSel').value = $('pestPick').value; renderPest(); } renderChemBox(); };
     $('pestSel').onchange = () => { $('pestPick').value = $('pestSel').value; renderPest(); renderChemBox(); };
-    setCrop(); renderChemTable();
+    setCrop(); renderChemTable(); renderRefTables();
+    ['svAcres', 'svCost', 'svJobs', 'svBad', 'svLost', 'svTower'].forEach(id => $(id).addEventListener('input', renderSavings)); renderSavings();
     $('wlBtn').onclick = joinWaitlist; renderQr();
     renderNetwork(); pullNetwork(false); setInterval(() => pullNetwork(true), 8000);
     window.__sow = { state: () => ({ idx: idx, time: fmtTime(series[idx].min), status: evals[idx].status, weather: evals[idx].weather, concerns: evals[idx].concerns.length, feed: netOnline, used: usedCommunity().length, ground: evals[idx].ground.status, logLen: log.length, playing: playing, source: source.kind, n: series.length, step: stepMin }) };

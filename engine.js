@@ -215,7 +215,15 @@
     return { state, current: cur, runMin, needMin: need, ranOut, next };
   }
 
-  const api = { DEFAULT_CFG, evaluate, validateCfg, goWindows, jobAssessment, compass, angDiff, f1, RANK, NAMES };
+  /* Savings estimate. Every input is the grower's own number. Nothing here is measured. */
+  function savings(i) {
+    const ok = v => typeof v === 'number' && isFinite(v) && v >= 0;
+    if (![i.acres, i.costPerAcre, i.jobs, i.badPct, i.lostPct, i.towerYear].every(ok) || i.badPct > 100 || i.lostPct > 100) return null;
+    const jobCost = i.acres * i.costPerAcre, lostJobs = i.jobs * i.badPct / 100 * i.lostPct / 100, avoidable = lostJobs * jobCost;
+    return { jobCost, lostJobs, avoidable, net: avoidable - i.towerYear, breakEvenJobs: jobCost > 0 ? i.towerYear / jobCost : null };
+  }
+
+  const api = { DEFAULT_CFG, evaluate, validateCfg, goWindows, jobAssessment, savings, compass, angDiff, f1, RANK, NAMES };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   root.SprayEngine = api;
 })(typeof window !== 'undefined' ? window : globalThis);

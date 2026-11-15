@@ -117,6 +117,11 @@ async def main():
         net['wx_ok'] = True
 
         print('Records and layout')
+        ck('crop and pest reference tables list 10 crops and 16 pests with sources', await pg.evaluate("document.querySelectorAll('#cropT tbody tr').length") == 10 and await pg.evaluate("document.querySelectorAll('#pestT tbody tr').length") == 16 and await pg.evaluate("document.querySelectorAll('#pestT a[href*=\"arizona.edu\"]').length") == 16)
+        so = await tc('#svOut')
+        ck('savings estimate computes from the inputs and says when it does not pay', '$800' in so and '$720' in so and '$1,180 behind' in so and '2.4 saved jobs' in so, so)
+        await pg.evaluate("const i=document.getElementById('svBad'); i.value='60'; i.dispatchEvent(new Event('input'))"); so = await tc('#svOut')
+        ck('savings estimate updates when an input changes', '$2,880' in so and '$980 ahead' in so, so)
         head = (await rows()).split('\r\n')[0].split(',')
         ck('CSV export still works and carries the new tags', head[0] == 'measurement_timestamp' and head[-5:] == ['overall_decision', 'site_concerns', 'mode', 'location', 'community_feed'] and len(await parsed()) >= 1, head)
         order = await pg.evaluate("['statusCard','tower','jobStrip','tl','recent','jobSec'].map(id => Math.round(document.getElementById(id).getBoundingClientRect().top + scrollY))")

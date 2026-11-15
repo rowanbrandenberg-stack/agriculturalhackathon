@@ -371,3 +371,14 @@ details.sec>summary:hover{background:var(--soft)}
 .why{grid-column:2;grid-row:1/3}
 .why>.reasons{grid-column:auto;grid-row:auto}
 @media (max-width:640px){.why{grid-column:1;grid-row:auto}}
+
+/* reference tables and savings estimate */
+.refH{font:600 20px/1.2 var(--display);margin:18px 0 8px}
+.svIn{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px 18px;margin-bottom:14px}
+.svIn label{display:grid;gap:4px;font-size:13px;color:var(--mut)}
+.svIn input{font:500 16px var(--text);padding:8px 10px;border:1px solid var(--rule);border-radius:4px;width:100%;box-sizing:border-box}
+.svOut{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:14px;margin-bottom:10px}
+.svOut span{display:block;font-size:12.5px;color:var(--mut)}
+.svOut b{display:block;font:600 22px/1.2 var(--display)}
+@media (max-width:1100px){.svOut{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:640px){.svIn{grid-template-columns:minmax(0,1fr)}}

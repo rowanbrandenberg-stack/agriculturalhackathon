@@ -112,6 +112,22 @@
     </div>
   </details>
 
+  <details class="sec" id="saveSec">
+    <summary><b>Savings estimate</b><span>What a missed weather call costs, using your own numbers</span></summary>
+    <div class="secBody">
+      <div class="svIn">
+        <label>Acres per job <input type="number" id="svAcres" value="40" min="0" step="1"></label>
+        <label>Product and application cost per acre, $ <input type="number" id="svCost" value="20" min="0" step="1"></label>
+        <label>Spray jobs per season <input type="number" id="svJobs" value="12" min="0" step="1"></label>
+        <label>Jobs started in unsuitable weather, % <input type="number" id="svBad" value="15" min="0" max="100" step="1"></label>
+        <label>Of those, lost or redone, % <input type="number" id="svLost" value="50" min="0" max="100" step="1"></label>
+        <label>Tower cost per year, $ <input type="number" id="svTower" value="1900" min="0" step="50"></label>
+      </div>
+      <div id="svOut" class="svOut"></div>
+      <div class="muted small">Every figure above is yours to change. The starting values are illustrations, not data: we have not measured how often jobs are started in unsuitable weather. The tower figure is our own estimate ($4,500 installed plus $400 a year, over three years). This leaves out the cost of a drift claim or damage to a neighbor, which can be far larger and which we cannot estimate.</div>
+    </div>
+  </details>
+
   <details class="sec" id="rulesSec">
     <summary><b>Decision rules and job settings</b><span>Active thresholds, product, sensitive site, data import</span></summary>
     <div class="secBody">
@@ -238,6 +254,8 @@
     <div class="secBody">
       <div class="row"><label class="chk">What did scouting find <select id="pestSel"></select></label> <span class="muted small" id="pestCropTxt"></span></div>
       <div class="pest" id="pestBox"></div>
+      <h3 class="refH">All crops in this database</h3><div class="tblwrap"><table class="chemT" id="cropT"></table></div>
+      <h3 class="refH">All pests in this database</h3><div class="tblwrap"><table class="chemT" id="pestT"></table></div>
       <div class="muted small">Paraphrased from University of Arizona Cooperative Extension, the UA Arizona Pest Management Center and UC IPM. A reference for the conversation with your PCA, not a prescription. The PCA writes the recommendation and the label is the law.</div>
     </div>
   </details>
