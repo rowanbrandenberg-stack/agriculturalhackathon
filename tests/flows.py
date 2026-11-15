@@ -16,7 +16,7 @@ async def main():
             day = 8 <= hr <= 17
             t2.append(70.0 if day else 50.0); t80.append(66.0 if day else 56.0)
             w10.append(5.0 if day else 4.0); w80.append(15.0); dd10.append(330); dd80.append(300)
-        MOCK = json.dumps({'utc_offset_seconds': 0, 'hourly': {'time': T, 'temperature_2m': t2, 'temperature_80m': t80, 'wind_speed_10m': w10, 'wind_speed_80m': w80, 'wind_direction_10m': dd10, 'wind_direction_80m': dd80}})
+        MOCK = json.dumps([{'utc_offset_seconds': 0, 'hourly': {'time': T, 'temperature_2m': t2, 'temperature_80m': t80, 'wind_speed_10m': w10, 'wind_speed_80m': w80, 'wind_direction_10m': dd10, 'wind_direction_80m': dd80}}] * 5)
         live_ok = {'v': True}
         async def wx(route):
             if live_ok['v']: await route.fulfill(status=200, content_type='application/json', body=MOCK, headers={'access-control-allow-origin': '*'})
@@ -117,6 +117,7 @@ async def main():
         ck('live: real location data loaded, 48 hourly values', s['source']=='live' and s['n']==48 and s['step']==60, s)
         ck('live: opens on the current hour with the expected call', s['status']==exp, (s, exp))
         ck('live: labelled as a regional model for the SouthWinds Farm area', 'Live regional model' in await txt('#srcTag') and 'SouthWinds Farm area' in await txt('#blockName') and 'No tower is installed' in await txt('#liveNote'))
+        ck('live: site value is an inverse distance weighted estimate from 5 model points', 'inverse distance weighted estimate from 5 model points' in await txt('#liveNote'), await txt('#liveNote'))
         ck('live: demo scenarios hidden, go to now shown', not await pg.is_visible('#scen') and await pg.is_visible('#liveNow'))
         ck('live: 260 ft model wind is not judged against the canopy limit', 'limit at 260 ft' not in await txt('#reasons') and 'Live model mode' in await txt('#rulesLine'), await txt('#reasons'))
         ck('live: the invented demo school is not shown at a real place', 'school' not in await txt('#reasons') and 'school' not in await txt('#blockTxt'), await txt('#reasons'))

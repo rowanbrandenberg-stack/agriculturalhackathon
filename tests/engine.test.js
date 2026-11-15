@@ -96,5 +96,24 @@ t('changing thresholds changes the comparison statistic (' + missed2.toFixed(1) 
 t('simulated day is deterministic', JSON.stringify(S.generateDay(7)) === JSON.stringify(S.generateDay(7)));
 t('no slot in the simulated day is UNABLE', evals.every(e => e.status !== 'UNABLE'));
 
+console.log('Spatial estimate (IDW)');
+const SPT = require('../spatial.js');
+const A = { lat: 31.97, lon: -110.29 }, B = { lat: 32.015, lon: -110.29 }, C = { lat: 31.925, lon: -110.29 };
+t('distance: 0.045 degrees of latitude is about 5 km', Math.abs(SPT.distKm(A, B) - 5) < 0.1, String(SPT.distKm(A, B)));
+t('IDW of equal values is that value', Math.abs(SPT.idw([{ ...A, v: 4 }, { ...B, v: 4 }], A) - 4) < 1e-9);
+t('IDW: two points at equal distance give the midpoint', Math.abs(SPT.idw([{ ...B, v: 10 }, { ...C, v: 20 }], A) - 15) < 0.01);
+const near = SPT.idw([{ ...A, v: 10 }, { ...B, v: 20 }], A);
+t('IDW: the closer point counts more but does not take everything', near > 10 && near < 11, String(near));
+t('IDW skips missing values', Math.abs(SPT.idw([{ ...A, v: null }, { ...B, v: 7 }], A) - 7) < 1e-9);
+t('IDW with no valid values is null, never a number', SPT.idw([{ ...A, v: null }], A) === null);
+const wr = SPT.idwReading([{ ...B, r: { tLo: 50, tHi: 48, wLo: 5, dLo: 350, wHi: 5, dHi: 350 } }, { ...C, r: { tLo: 50, tHi: 48, wLo: 5, dLo: 10, wHi: 5, dHi: 10 } }], A);
+t('wind from 350 and 10 degrees averages to north, not south', E.angDiff(wr.dLo, 0) < 1 && Math.abs(wr.wLo - 5) < 1e-9, JSON.stringify(wr));
+t('inversion count over points', JSON.stringify(SPT.inversionCount([{ r: { tLo: 50, tHi: 55 } }, { r: { tLo: 50, tHi: 45 } }, { r: { tLo: null, tHi: 45 } }])) === '{"inv":1,"of":2}');
+const nbE = ev({}, { nearby: { inv: 2, of: 5, km: 5 } });
+t('nearby points inverted while the site is not: CAUTION, never GO', nbE.status === 'CAUTION' && has(nbE, 'NEARBY_INVERSION'), nbE.status);
+t('no nearby inversion: stays GO', ev({}, { nearby: { inv: 0, of: 5, km: 5 } }).status === 'GO');
+const nbS = ev({ tHi: 75 }, { nearby: { inv: 5, of: 5, km: 5 } });
+t('site inversion is still STOP and is not double counted', nbS.status === 'STOP' && !has(nbS, 'NEARBY_INVERSION'));
+
 console.log('\n' + pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);

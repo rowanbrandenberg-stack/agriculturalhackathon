@@ -131,6 +131,11 @@
     if (heatLimit != null && V.tLo && r.tLo >= heatLimit) T.push({ code: 'PRODUCT_HEAT', level: 1, title: 'At or above the heat limit set for this product',
       text: 'It is ' + f1(r.tLo) + '°F at ' + lo + '. The heat limit set for ' + (cfg.productName || 'this product') + ' is ' + heatLimit + '°F. ' + (cfg.heatText || 'Volatile products can give off more vapor in heat.') });
 
+    // 6b. Spatial check (live model mode): some model points around the site show an inversion while the site estimate does not.
+    const nb = cfg.nearby;
+    if (nb && nb.inv > 0 && !T.some(t => t.code === 'INVERSION')) T.push({ code: 'NEARBY_INVERSION', level: 1, title: 'Inversion at nearby model points',
+      text: nb.inv + ' of ' + nb.of + ' model points within ' + nb.km + ' km show warmer air above cooler air, while the estimate for this site does not. Inversions are patchy. Check on site.' });
+
     // 7. Actual community reports nearby. Unverified, so they can only ADD caution.
     const comm = cfg.community || [];
     const closest = a => a.slice().sort((x, y) => x.distMi - y.distMi)[0];

@@ -87,11 +87,20 @@ In live mode only three rules run: the inversion check (80 m air warmer than 2 m
 
 Coordinates are rounded to the area, not the farm address.
 
+### Spatial estimate (IDW)
+
+Live mode reads five model points: the site and four points 5 km north, east, south and west. The site value is an inverse distance weighted (IDW) estimate, power 2, with a 1 km distance floor so one point cannot take all the weight. Wind is averaged as a vector. Code and comments are in `spatial.js`.
+
+If any of the five points shows an inversion while the site estimate does not, the status drops to CAUTION ("Inversion at nearby model points"), because inversions are patchy.
+
+Kriging is not implemented. It needs enough real stations to fit a variogram for the area, and this prototype has model points only. With a network of towers, kriging would replace IDW in one function (`idwReading`) and would also give an uncertainty for each estimate.
+
+
 ## Tests
 
 ```
 node tests/engine.test.js      # 64 decision logic checks, no dependencies
-python3 tests/flows.py [url]   # 49 user flow checks in a headless browser (needs Playwright and Chrome)
+python3 tests/flows.py [url]   # 61 user flow checks in a headless browser (needs Playwright and Chrome)
 ```
 
 ## Files

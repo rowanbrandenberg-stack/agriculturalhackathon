@@ -3,7 +3,7 @@
   const E = window.SprayEngine, S = window.SpraySim;
   const $ = id => document.getElementById(id);
   const f1 = E.f1;
-  const BUILD = '2026-11-15.11';
+  const BUILD = '2026-11-15.12';
   /* Live mode: a real location, real model weather. Rounded coordinates for the area, not the farm's address. No tower is installed there. */
   const FARM = { name: 'SouthWinds Farm area', place: 'near Benson, Arizona', lat: 31.97, lon: -110.29 };
   const BLOCK_SIM = 'Block 7, lemons, Yuma County, Arizona';
@@ -73,15 +73,16 @@
   const reading = i => { const r = Object.assign({}, series[i].r); if (dropHi) { r.tHi = null; r.wHi = null; r.dHi = null; } return r; };
   /* What the rules see. In live model mode the upper wind is at 260 ft, far above any canopy, so the shear and upper wind rules
      are not applied: the upper wind is replaced by the ground wind and only the temperature pair and ground wind are judged. */
+  const cfgAt = i => (isLive() && series[i].near) ? Object.assign({}, cfg, { nearby: series[i].near }) : cfg;
   const evalReading = i => { const r = reading(i); if (isLive()) { r.wHi = r.wLo; r.dHi = r.dLo; } return r; };
   const metaOf = i => ({ ageMin: series[i].ageMin, staleMin: cfg.staleIntervals * stepMin });
-  function recompute() { evals = series.map((s, i) => E.evaluate(evalReading(i), cfg, metaOf(i))); overIdx = null; }
+  function recompute() { evals = series.map((s, i) => E.evaluate(evalReading(i), cfgAt(i), metaOf(i))); overIdx = null; }
   /* Community reports are about right now, so they adjust only the current reading, never the day totals. */
   function setNow() {
-    if (overIdx != null && overIdx !== idx && overIdx < series.length) evals[overIdx] = E.evaluate(evalReading(overIdx), cfg, metaOf(overIdx));
-    evals[idx] = E.evaluate(evalReading(idx), Object.assign({}, cfg, { community: community }), metaOf(idx)); overIdx = idx;
+    if (overIdx != null && overIdx !== idx && overIdx < series.length) evals[overIdx] = E.evaluate(evalReading(overIdx), cfgAt(overIdx), metaOf(overIdx));
+    evals[idx] = E.evaluate(evalReading(idx), Object.assign({}, cfgAt(idx), { community: community }), metaOf(idx)); overIdx = idx;
   }
-  const baseEvals = () => evals.map((e, i) => i === overIdx ? E.evaluate(evalReading(i), cfg, metaOf(i)) : e);
+  const baseEvals = () => evals.map((e, i) => i === overIdx ? E.evaluate(evalReading(i), cfgAt(i), metaOf(i)) : e);
   function download(name, text, type) { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], { type: type || 'text/csv' })); a.download = name; document.body.appendChild(a); a.click(); a.remove(); }
 
   /* ---------- current weather ---------- */
@@ -328,7 +329,7 @@
   }
 
   /* ---------- what, when, how ---------- */
-  const HOW_SOURCES = [['Ohio State Extension, FABE 535', 'https://ohioline.osu.edu/factsheet/fabe-535'], ['Montana State Extension', 'https://www.montana.edu/extension/pesticides/reference/drift.html'], ['NDSU Extension, AE1246', 'https://ndsu.edu/agriculture/sites/default/files/2024-10/ae1246.pdf'], ['Health Canada', 'https://www.canada.ca/en/health-canada/services/consumer-product-safety/pesticides-pest-management/growers-commercial-users/drift-mitigation/management-pesticide-spray-drift.html']];
+  const HOW_SOURCES = [['University of Arizona Extension, AZ1050', 'https://extension.arizona.edu/sites/extension.arizona.edu/files/pubs/az1050.pdf'], ['Ohio State Extension, FABE 535', 'https://ohioline.osu.edu/factsheet/fabe-535'], ['Montana State Extension', 'https://www.montana.edu/extension/pesticides/reference/drift.html'], ['NDSU Extension, AE1246', 'https://ndsu.edu/agriculture/sites/default/files/2024-10/ae1246.pdf'], ['Health Canada', 'https://www.canada.ca/en/health-canada/services/consumer-product-safety/pesticides-pest-management/growers-commercial-users/drift-mitigation/management-pesticide-spray-drift.html']];
   function renderWWW() {
     const ev = evals[idx], p = PROFILES[cfg.profile || 'custom'], b = baseEvals(); b[idx] = ev;
     const j = E.jobAssessment(b, idx, stepMin, cfg.jobHours);
@@ -486,7 +487,7 @@
     $('scen').hidden = isLive(); $('liveNow').hidden = !isLive(); $('demoReset').hidden = isLive();
     $('liveNote').hidden = !isLive();
     document.querySelector('.gtitle').textContent = isLive() ? 'Ground only comparison: model wind near the ground' : 'Ground station comparison: wind at 5 ft only';
-    if (isLive()) $('liveNote').innerHTML = '<span class="srcTag">Live regional model</span> Real weather model values for the ' + FARM.name + ' ' + FARM.place + ', fetched ' + source.fetched.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) + ' and refreshed every 10 minutes. Temperature at 2 m and 80 m, wind at 10 m and 80 m (Open-Meteo). <b>No tower is installed at the farm.</b> A regional model does not resolve one field, so treat this as the best available estimate until a two height tower is on site. Hours after now are forecast.';
+    if (isLive()) $('liveNote').innerHTML = '<span class="srcTag">Live regional model</span> Real weather model values for the ' + FARM.name + ' ' + FARM.place + ', fetched ' + source.fetched.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) + ' and refreshed every 10 minutes. Temperature at 2 m and 80 m, wind at 10 m and 80 m (Open-Meteo). ' + (livePts > 1 ? 'The site value is an inverse distance weighted estimate from ' + livePts + ' model points within ' + RING_KM + ' km, and the tool warns when those points disagree about an inversion.' : '') + ' <b>No tower is installed at the farm.</b> A regional model does not resolve one field, so treat this as the best available estimate until a two height tower is on site. Hours after now are forecast.';
     $('srcLabel').textContent = source.kind === 'sim' ? 'Sensors at 5 ft and 30 ft, one reading every ' + stepMin + ' minutes. Not live.'
       : isLive() ? 'Open-Meteo model for the area, hourly. Not a measurement at the farm.'
       : 'File ' + source.file + ', ' + source.rows + ' readings measured ' + fmtTime(source.first) + ' to ' + fmtTime(source.last) + '. Last reading ' + fmtTime(source.last) + '. A file is not a live feed.';
@@ -712,16 +713,29 @@
   }
 
   /* ---------- live mode: real model weather for a real location ---------- */
-  let liveTimer = null, followNow = true, simSite = true;
+  let liveTimer = null, followNow = true, simSite = true, livePts = 1;
+  const SP = window.SpraySpatial;
   function nowIdx() { if (!isLive()) return idx; const d = new Date(), m = d.getHours() * 60; let best = 0; series.forEach((s, i) => { if (s.min <= m) best = i; }); return best; }
+  const RING_KM = 5;
+  function livePoints() {   // the site plus four points 5 km north, east, south and west
+    const dLat = RING_KM / 111.2, dLon = RING_KM / (111.2 * Math.cos(FARM.lat * Math.PI / 180)), r4 = v => Math.round(v * 1e4) / 1e4;
+    return [[0, 0], [dLat, 0], [0, dLon], [-dLat, 0], [0, -dLon]].map(o => ({ lat: r4(FARM.lat + o[0]), lon: r4(FARM.lon + o[1]) }));
+  }
   async function fetchLive() {
-    const url = 'https://api.open-meteo.com/v1/forecast?latitude=' + FARM.lat + '&longitude=' + FARM.lon +
+    const P = livePoints();
+    const url = 'https://api.open-meteo.com/v1/forecast?latitude=' + P.map(p => p.lat).join(',') + '&longitude=' + P.map(p => p.lon).join(',') +
       '&hourly=temperature_2m,temperature_80m,wind_speed_10m,wind_speed_80m,wind_direction_10m,wind_direction_80m&temperature_unit=fahrenheit&wind_speed_unit=mph&timezone=America%2FPhoenix&forecast_days=2';
     const res = await fetch(url); if (!res.ok) throw new Error('HTTP ' + res.status);
-    const j = await res.json(), hh = j.hourly; if (!hh || !hh.time || hh.time.length < 24) throw new Error('unexpected response');
-    const d0 = hh.time[0].slice(0, 10), nn = v => (typeof v === 'number' && isFinite(v)) ? v : null;
-    return hh.time.map((t, i) => ({ min: (t.slice(0, 10) === d0 ? 0 : 1440) + (+t.slice(11, 13)) * 60, ageMin: 0,
-      r: { tLo: nn(hh.temperature_2m[i]), tHi: nn(hh.temperature_80m[i]), wLo: nn(hh.wind_speed_10m[i]), wHi: nn(hh.wind_speed_80m[i]), dLo: nn(hh.wind_direction_10m[i]), dHi: nn(hh.wind_direction_80m[i]) } })).slice(0, 48);
+    let j = await res.json(); if (!Array.isArray(j)) j = [j];
+    const good = j.map((x, k) => ({ p: P[k], hh: x && x.hourly })).filter(x => x.p && x.hh && x.hh.time && x.hh.time.length >= 24);
+    if (!good.length) throw new Error('unexpected response');
+    const T0 = good[0].hh.time, d0 = T0[0].slice(0, 10), nn = v => (typeof v === 'number' && isFinite(v)) ? v : null;
+    livePts = good.length;
+    return T0.map((t, i) => {
+      const pts = good.map(g => ({ lat: g.p.lat, lon: g.p.lon, r: { tLo: nn(g.hh.temperature_2m[i]), tHi: nn(g.hh.temperature_80m[i]), wLo: nn(g.hh.wind_speed_10m[i]), wHi: nn(g.hh.wind_speed_80m[i]), dLo: nn(g.hh.wind_direction_10m[i]), dHi: nn(g.hh.wind_direction_80m[i]) } }));
+      const c = SP.inversionCount(pts);
+      return { min: (t.slice(0, 10) === d0 ? 0 : 1440) + (+t.slice(11, 13)) * 60, ageMin: 0, r: SP.idwReading(pts, FARM), near: pts.length > 1 ? { inv: c.inv, of: c.of, km: RING_KM } : null };
+    }).slice(0, 48);
   }
   async function goLive() {
     const btn = $('modeLive'); btn.disabled = true; btn.textContent = 'Loading live data…';
