@@ -1,175 +1,205 @@
 /* Spray or Wait: decision engine.
-   Pure functions, no DOM. Runs in the browser and in Node (for tests).
-   Thresholds follow the challenge brief (3 to 10 mph is common guidance).
-   Every limit is adjustable because the pesticide label always wins. */
+   Pure functions, no DOM. Runs in the browser and in Node (tests/engine.test.js).
+
+   Rules, in plain words:
+   1. Inversion: upper temperature greater than lower temperature is ALWAYS an inversion alert (STOP).
+      A positive difference inside the sensor uncertainty is still shown, with a note. It is never ignored.
+   2. Wind: flag below windMin or above windMax at EITHER height. 3 and 10 mph are common guidance.
+      The product label controls the real limits, so both are settings.
+   3. Shear: flag a large speed or direction difference between heights. These two thresholds are
+      configurable prototype values, not sourced limits.
+   4. Direction is not trusted when wind is effectively calm.
+   5. Missing, invalid or stale required readings can never produce GO. They produce UNABLE
+      (unable to assess), unless a valid reading already confirms a STOP.
+   6. Status is the worst single trigger. Nothing is averaged, so nothing can cancel a STOP. */
 (function (root) {
   const DEFAULT_CFG = {
-    windMin: 3,        // mph, common guidance; label may differ
-    windMax: 10,       // mph, common guidance; label may differ
-    shearSpeed: 5,     // mph difference between heights that we flag
-    shearDir: 45,      // degrees difference between heights that we flag
-    invStrong: 0.5,    // deg F; above this an inversion is a hard stop
-    nearNeutral: 0.5,  // deg F; upper air this close to lower air = barely mixing
-    volatility: 'low', // low | medium | high
-    hotF: 85,          // deg F; heat raises vapor loss for volatile products
-    heatLimit: null,   // deg F; product specific ceiling, null = none
-    heatText: '',
-    productName: '',
-    profile: 'custom',
-    siteOn: true,
-    siteName: 'school',
-    siteBearing: 90,   // degrees from the block toward the sensitive site
-    siteCone: 45,      // degrees either side counted as "toward"
+    windMin: 3, windMax: 10,       // mph, common guidance; label controls
+    shearSpeed: 5,                 // mph, prototype threshold
+    shearDir: 45,                  // degrees, prototype threshold
+    sensorUnc: 0.5,                // deg F, stated uncertainty of the temperature difference
+    calmMph: 1,                    // below this, wind direction is treated as unreliable
+    staleIntervals: 2,             // a reading older than this many sampling intervals is stale
+    volatility: 'low', hotF: 85, heatLimit: null, heatText: '', productName: '', profile: 'custom',
+    siteOn: true, siteName: 'school', siteBearing: 90, siteCone: 45,
     jobHours: 2,
-    bufferRows: 3,     // edge rows (of 12) to hold back on the side facing a downwind site
-    loLabel: '5 ft',
-    hiLabel: '30 ft',
-    skipHiWind: false,     // used for coarse forecast data
-    skipShearSpeed: false  // used for coarse forecast data
+    loLabel: '5 ft', hiLabel: '30 ft',
+    skipHiWind: false, skipShearSpeed: false   // used only for the regional model forecast
   };
 
   const COMPASS = ['N','NNE','NE','ENE','E','ESE','SE','SSE','S','SSW','SW','WSW','W','WNW','NW','NNW'];
   function compass(d) { return COMPASS[Math.round((((d % 360) + 360) % 360) / 22.5) % 16]; }
+  /* Shortest circular angle: 359 vs 1 is 2 degrees. */
   function angDiff(a, b) { const d = Math.abs(a - b) % 360; return d > 180 ? 360 - d : d; }
   function f1(x) { return (Math.round(x * 10) / 10).toFixed(1); }
-  const RANK = { GO: 0, CAUTION: 1, STOP: 2 };
+  const isNum = x => typeof x === 'number' && isFinite(x);
+  const okTemp = t => isNum(t) && t >= -60 && t <= 140;
+  const okWind = w => isNum(w) && w >= 0 && w <= 150;
+  const okDir = d => isNum(d) && d >= 0 && d <= 360;
+  const RANK = { GO: 0, CAUTION: 1, UNABLE: 1.5, STOP: 2 };
   const NAMES = ['GO', 'CAUTION', 'STOP'];
 
-  /* r = { tLo, tHi, wLo, wHi, dLo, dHi }  temps in F, wind mph, direction = where wind comes FROM */
-  function evaluate(r, cfgIn) {
+  function validateCfg(c) {
+    const e = [];
+    if (!isNum(c.windMin) || c.windMin < 0) e.push('Wind minimum must be 0 mph or more.');
+    if (!isNum(c.windMax) || c.windMax <= 0 || c.windMax > 60) e.push('Wind maximum must be between 0 and 60 mph.');
+    if (isNum(c.windMin) && isNum(c.windMax) && c.windMax <= c.windMin) e.push('Wind maximum must be greater than wind minimum.');
+    if (!isNum(c.shearSpeed) || c.shearSpeed <= 0) e.push('Speed difference threshold must be greater than 0 mph.');
+    if (!isNum(c.shearDir) || c.shearDir <= 0 || c.shearDir > 180) e.push('Direction difference threshold must be between 1 and 180 degrees.');
+    if (!isNum(c.jobHours) || c.jobHours <= 0 || c.jobHours > 24) e.push('Job length must be between 0 and 24 hours.');
+    if (!isNum(c.sensorUnc) || c.sensorUnc < 0 || c.sensorUnc > 5) e.push('Sensor uncertainty must be between 0 and 5 degrees F.');
+    if (!isNum(c.staleIntervals) || c.staleIntervals < 1) e.push('Freshness limit must be at least 1 sampling interval.');
+    if (c.heatLimit != null && !okTemp(c.heatLimit)) e.push('Heat limit is not a valid temperature.');
+    return e;
+  }
+
+  /* r = { tLo, tHi, wLo, wHi, dLo, dHi }. Temps in F, wind mph, direction is where wind comes FROM.
+     meta = { ageMin, staleMin }. A reading older than staleMin is stale. */
+  function evaluate(r, cfgIn, meta) {
     const cfg = Object.assign({}, DEFAULT_CFG, cfgIn || {});
     const lo = cfg.loLabel, hi = cfg.hiLabel;
-    const T = [];
-    const dT = r.tHi - r.tLo;
+    r = r || {};
+    const cfgErr = validateCfg(cfg);
+    if (cfgErr.length) return { status: 'UNABLE', level: -1, triggers: [], problems: [{ code: 'BAD_SETTINGS', text: 'Settings are not valid. ' + cfgErr[0] }],
+      dT: null, shearSpd: null, shearDir: null, dirReliable: false, ground: { status: 'UNABLE', text: 'Settings are not valid.' }, missed: false };
 
-    // 1. Temperature inversion: upper air warmer than lower air
-    if (dT > 0) {
-      const strong = dT >= cfg.invStrong || cfg.volatility === 'high';
-      T.push({
-        code: 'INVERSION', level: strong ? 2 : 1,
-        title: strong ? 'Temperature inversion' : 'Weak temperature inversion',
-        text: 'Air at ' + hi + ' is ' + f1(dT) + '°F warmer than at ' + lo +
-          '. Spray gets trapped in a shallow layer near the ground and can drift sideways a long way.' +
-          (strong ? '' : ' The difference is small, so treat it as an inversion starting or ending.')
-      });
-    } else if (dT > -cfg.nearNeutral) {
-      T.push({
-        code: 'NEAR_INVERSION', level: 1,
-        title: 'Air is barely mixing',
-        text: 'Air at ' + hi + ' is only ' + f1(-dT) + '°F cooler than at ' + lo +
-          '. An inversion may be forming or just breaking up.'
-      });
+    const problems = [];
+    const stale = !!(meta && isNum(meta.ageMin) && isNum(meta.staleMin) && meta.ageMin > meta.staleMin);
+    if (stale) problems.push({ code: 'STALE', text: 'Readings are ' + Math.round(meta.ageMin) + ' minutes old. The limit is ' + Math.round(meta.staleMin) + ' minutes (' + cfg.staleIntervals + ' sampling intervals).' });
+    const needHiWind = !cfg.skipHiWind;
+    const V = { tLo: !stale && okTemp(r.tLo), tHi: !stale && okTemp(r.tHi), wLo: !stale && okWind(r.wLo), wHi: !stale && okWind(r.wHi), dLo: !stale && okDir(r.dLo), dHi: !stale && okDir(r.dHi) };
+    if (!stale) {
+      if (!V.tLo) problems.push({ code: 'NO_TLO', text: 'No valid temperature from the ' + lo + ' sensor.' });
+      if (!V.tHi) problems.push({ code: 'NO_THI', text: 'No valid temperature from the ' + hi + ' sensor.' });
+      if (!V.wLo) problems.push({ code: 'NO_WLO', text: 'No valid wind speed from the ' + lo + ' sensor.' });
+      if (needHiWind && !V.wHi) problems.push({ code: 'NO_WHI', text: 'No valid wind speed from the ' + hi + ' sensor.' });
+      if (V.wLo && r.wLo >= cfg.calmMph && !V.dLo) problems.push({ code: 'NO_DLO', text: 'No valid wind direction from the ' + lo + ' sensor.' });
+      if (needHiWind && V.wHi && r.wHi >= cfg.calmMph && !V.dHi) problems.push({ code: 'NO_DHI', text: 'No valid wind direction from the ' + hi + ' sensor.' });
+    }
+
+    const T = [];
+    const dT = V.tLo && V.tHi ? r.tHi - r.tLo : null;
+
+    // 1. Inversion. Any positive difference is an alert.
+    if (dT != null && dT > 0) {
+      T.push({ code: 'INVERSION', level: 2, title: 'Temperature inversion',
+        text: 'Air at ' + hi + ' is ' + f1(dT) + '°F warmer than at ' + lo + '. Upper air warmer than lower air is an inversion. Fine droplets and vapor can stay in a shallow layer and travel sideways.' +
+          (dT < cfg.sensorUnc ? ' This difference is inside the ±' + cfg.sensorUnc + '°F sensor uncertainty, so it may not be a true inversion. The alert is shown anyway because a positive difference is never ignored.' : '') });
+    } else if (dT != null && dT > -cfg.sensorUnc) {
+      T.push({ code: 'SMALL_DIFF', level: 1, title: 'Small temperature difference',
+        text: (dT === 0 ? 'Air at ' + hi + ' and ' + lo + ' is the same temperature.' : 'Air at ' + hi + ' is only ' + f1(-dT) + '°F cooler than at ' + lo + '.') +
+          ' That is inside the ±' + cfg.sensorUnc + '°F sensor uncertainty of an inversion. Mixing strength is not established by these readings.' });
     }
 
     // 2. Wind limits at each height
-    if (r.wLo > cfg.windMax) T.push({ code: 'WIND_HIGH_LO', level: 2, title: 'Wind too strong at ' + lo,
-      text: 'Wind at ' + lo + ' is ' + f1(r.wLo) + ' mph, over your ' + cfg.windMax + ' mph limit.' });
-    if (!cfg.skipHiWind && r.wHi > cfg.windMax) T.push({ code: 'WIND_HIGH_HI', level: 2, title: 'Wind too strong above the trees',
-      text: 'Wind at ' + hi + ' is ' + f1(r.wHi) + ' mph, over your ' + cfg.windMax +
-        ' mph limit. Spray that clears the canopy will be carried off target.' });
-    if (r.wLo < cfg.windMin) T.push({ code: 'WIND_LOW_LO', level: 1, title: 'Wind too light at ' + lo,
-      text: 'Wind at ' + lo + ' is only ' + f1(r.wLo) + ' mph, under your ' + cfg.windMin +
-        ' mph minimum. Near calm air moves spray in unpredictable directions and often comes with an inversion.' });
-    if (!cfg.skipHiWind && r.wHi < cfg.windMin) T.push({ code: 'WIND_LOW_HI', level: 1, title: 'Wind too light at ' + hi,
-      text: 'Wind at ' + hi + ' is only ' + f1(r.wHi) + ' mph, under your ' + cfg.windMin + ' mph minimum.' });
+    if (V.wLo && r.wLo > cfg.windMax) T.push({ code: 'WIND_HIGH_LO', level: 2, title: 'Wind above your limit at ' + lo,
+      text: 'Wind at ' + lo + ' is ' + f1(r.wLo) + ' mph. Your limit is ' + cfg.windMax + ' mph.' });
+    if (needHiWind && V.wHi && r.wHi > cfg.windMax) T.push({ code: 'WIND_HIGH_HI', level: 2, title: 'Wind above your limit at ' + hi,
+      text: 'Wind at ' + hi + ' is ' + f1(r.wHi) + ' mph. Your limit is ' + cfg.windMax + ' mph. A reading at ' + lo + ' alone does not show this.' });
+    if (V.wLo && r.wLo < cfg.windMin) T.push({ code: 'WIND_LOW_LO', level: 1, title: 'Wind below your minimum at ' + lo,
+      text: 'Wind at ' + lo + ' is ' + f1(r.wLo) + ' mph. Your minimum is ' + cfg.windMin + ' mph. Direction is unreliable in near calm air, and calm conditions can accompany an inversion.' });
+    if (needHiWind && V.wHi && r.wHi < cfg.windMin) T.push({ code: 'WIND_LOW_HI', level: 1, title: 'Wind below your minimum at ' + hi,
+      text: 'Wind at ' + hi + ' is ' + f1(r.wHi) + ' mph. Your minimum is ' + cfg.windMin + ' mph.' });
 
-    // 3. Wind shear: speed
-    const shearSpd = r.wHi - r.wLo;
-    if (!cfg.skipShearSpeed && Math.abs(shearSpd) >= cfg.shearSpeed) T.push({ code: 'SHEAR_SPEED', level: 1,
-      title: 'Wind speed changes with height',
-      text: 'Wind is ' + f1(Math.abs(shearSpd)) + ' mph ' + (shearSpd > 0 ? 'faster' : 'slower') + ' at ' + hi +
-        ' than at ' + lo + '. A ground reading does not show what the spray meets above the trees.' });
+    // 3. Shear: speed
+    const shearSpd = V.wLo && V.wHi ? r.wHi - r.wLo : null;
+    if (!cfg.skipShearSpeed && shearSpd != null && Math.abs(shearSpd) >= cfg.shearSpeed) T.push({ code: 'SHEAR_SPEED', level: 1,
+      title: 'Wind speed differs between heights',
+      text: 'Wind is ' + f1(Math.abs(shearSpd)) + ' mph ' + (shearSpd > 0 ? 'faster' : 'slower') + ' at ' + hi + ' than at ' + lo + '. This is at or over the ' + cfg.shearSpeed + ' mph prototype threshold.' });
 
-    // 4. Wind shear: direction (only meaningful when air is actually moving at both heights)
-    const moving = r.wLo >= 1 && r.wHi >= 1;
-    const shearDirDeg = moving ? angDiff(r.dLo, r.dHi) : 0;
-    if (moving && shearDirDeg >= cfg.shearDir) T.push({ code: 'SHEAR_DIR', level: 1,
-      title: 'Wind direction changes with height',
-      text: 'Wind at ' + lo + ' is from the ' + compass(r.dLo) + ' but wind at ' + hi + ' is from the ' + compass(r.dHi) +
-        ' (' + Math.round(shearDirDeg) + '° apart). Drift will not follow the ground wind.' });
+    // 4. Shear: direction. Only when wind is moving at both heights; calm air has no reliable direction.
+    const movLo = V.wLo && r.wLo >= cfg.calmMph && V.dLo, movHi = V.wHi && r.wHi >= cfg.calmMph && V.dHi;
+    const dirReliable = movLo && movHi;
+    const shearDirDeg = dirReliable ? angDiff(r.dLo, r.dHi) : null;
+    if (dirReliable && shearDirDeg >= cfg.shearDir) T.push({ code: 'SHEAR_DIR', level: 1,
+      title: 'Wind direction differs between heights',
+      text: 'Wind at ' + lo + ' is from the ' + compass(r.dLo) + ' and wind at ' + hi + ' is from the ' + compass(r.dHi) + ', ' + Math.round(shearDirDeg) + '° apart. This is at or over the ' + cfg.shearDir + '° prototype threshold. Ground wind direction alone does not represent both heights.' });
 
-    // 5. Sensitive site downwind at either height
+    // 5. Sensitive site in the measured downwind direction at either height
     let site = null;
     if (cfg.siteOn) {
       const hits = [];
-      if (r.wLo >= 1 && angDiff((r.dLo + 180) % 360, cfg.siteBearing) <= cfg.siteCone) hits.push(lo);
-      if (r.wHi >= 1 && angDiff((r.dHi + 180) % 360, cfg.siteBearing) <= cfg.siteCone) hits.push(hi);
-      if (hits.length) {
-        site = { code: 'SITE_DOWNWIND', level: 1, bearing: cfg.siteBearing, who: cfg.siteName, title: 'Wind is blowing toward the ' + cfg.siteName,
-          text: 'Wind at ' + hits.join(' and ') + ' would carry drift toward the ' + cfg.siteName +
-            ' to the ' + compass(cfg.siteBearing) + '.' };
-      }
+      if (movLo && angDiff((r.dLo + 180) % 360, cfg.siteBearing) <= cfg.siteCone) hits.push(lo);
+      if (movHi && angDiff((r.dHi + 180) % 360, cfg.siteBearing) <= cfg.siteCone) hits.push(hi);
+      if (hits.length) site = { code: 'SITE_DOWNWIND', level: 1, bearing: cfg.siteBearing, who: cfg.siteName,
+        title: 'Measured wind points toward the ' + cfg.siteName,
+        text: 'Wind measured at ' + hits.join(' and ') + ' points toward the ' + cfg.siteName + ' to the ' + compass(cfg.siteBearing) + '.' };
     }
 
-    // 6. Product specific heat limit (leaf burn for oils and sulfur, extra vapor for volatile products)
+    // 6. Product specific heat limit (prototype values)
     const heatLimit = cfg.heatLimit != null ? cfg.heatLimit : (cfg.volatility === 'high' ? cfg.hotF : null);
-    if (heatLimit != null && r.tLo >= heatLimit) T.push({ code: 'PRODUCT_HEAT', level: 1,
-      title: 'Too hot for this product',
-      text: 'It is ' + f1(r.tLo) + '\u00B0F at ' + lo + ', at or above the ' + heatLimit + '\u00B0F limit set for ' + (cfg.productName || 'this product') + '. ' +
-        (cfg.heatText || 'High volatility products give off more vapor in heat, and vapor can drift after spraying.') });
+    if (heatLimit != null && V.tLo && r.tLo >= heatLimit) T.push({ code: 'PRODUCT_HEAT', level: 1, title: 'At or above the heat limit set for this product',
+      text: 'It is ' + f1(r.tLo) + '°F at ' + lo + '. The heat limit set for ' + (cfg.productName || 'this product') + ' is ' + heatLimit + '°F. ' + (cfg.heatText || 'Volatile products can give off more vapor in heat.') });
 
-    // 7. Grower network: recent reports from nearby growers. Unverified, so they can only ADD caution, never remove it.
+    // 7. Actual community reports nearby. Unverified, so they can only ADD caution.
     const comm = cfg.community || [];
     const closest = a => a.slice().sort((x, y) => x.distMi - y.distMi)[0];
     const where = c => c.distMi < 0.15 ? 'at this block' : f1(c.distMi) + ' mi to the ' + compass(c.bearing);
     const ago = c => c.ageMin < 1 ? 'just now' : Math.round(c.ageMin) + ' min ago';
     const nInv = comm.filter(c => c.kind === 'inversion' && c.distMi <= 3 && c.ageMin <= 90);
-    if (nInv.length) {
-      const c = closest(nInv); const own = T.some(t => t.code === 'NEAR_INVERSION' || t.code === 'INVERSION');
-      T.push({ code: 'NET_INVERSION', level: own ? 2 : 1, title: 'Inversion signs reported nearby',
-        text: nInv.length + (nInv.length > 1 ? ' growers' : ' grower') + ' within 3 miles reported inversion signs in the last 90 minutes (closest ' + where(c) + ', ' + ago(c) + '). ' +
-          (own ? 'Your own tower agrees, so this is a stop.' : 'Your tower does not show it yet. Reports are unverified, so check on site before you start.') });
-    }
+    if (nInv.length) { const c = closest(nInv);
+      T.push({ code: 'NET_INVERSION', level: 1, title: 'Still air reported nearby',
+        text: nInv.length + (nInv.length > 1 ? ' growers' : ' grower') + ' within 3 miles reported signs of still air in the last 90 minutes (closest ' + where(c) + ', ' + ago(c) + '). Reports are unverified. Check on site.' }); }
     const nDrift = comm.filter(c => c.kind === 'drift' && c.distMi <= 3 && c.ageMin <= 180);
     if (nDrift.length) { const c = closest(nDrift);
       T.push({ code: 'NET_DRIFT', level: 1, title: 'Drift reported nearby',
-        text: 'A grower reported seeing drift ' + where(c) + ', ' + ago(c) + '. Conditions in the area are carrying spray off target.' }); }
+        text: 'A grower reported seeing drift ' + where(c) + ', ' + ago(c) + '. Reports are unverified.' }); }
     const crews = comm.filter(c => c.kind === 'crew' && c.distMi <= 1.5 && c.ageMin <= 480).filter(c => c.distMi < 0.15 ||
-      (r.wLo >= 1 && angDiff((r.dLo + 180) % 360, c.bearing) <= cfg.siteCone) || (r.wHi >= 1 && angDiff((r.dHi + 180) % 360, c.bearing) <= cfg.siteCone));
+      (movLo && angDiff((r.dLo + 180) % 360, c.bearing) <= cfg.siteCone) || (movHi && angDiff((r.dHi + 180) % 360, c.bearing) <= cfg.siteCone));
     let crew = null;
     if (crews.length) { const c = closest(crews);
-      crew = { code: 'NET_CREW', level: 1, bearing: c.bearing, who: 'crew', title: 'People reported working downwind',
-        text: 'A grower reported a crew working ' + where(c) + ', ' + ago(c) + ', and the wind would carry drift that way.' }; }
+      crew = { code: 'NET_CREW', level: 1, bearing: c.bearing, who: 'crew', title: 'People reported in the measured downwind direction',
+        text: 'A grower reported a crew working ' + where(c) + ', ' + ago(c) + '. Measured wind points that way.' }; }
 
-    // A sensitive site or crew downwind plus any other flag is a stop: the risks stack.
-    [site, crew].forEach(s => {
-      if (!s) return;
-      if (T.length) { s.level = 2; s.text += ' Combined with the other flags, that makes this a stop.'; }
-    });
+    // A site or crew in the measured downwind direction plus any other flag is a STOP.
+    [site, crew].forEach(s => { if (s && T.length) { s.level = 2; s.text += ' With the other flags, this is a stop.'; } });
     if (site) T.push(site); if (crew) T.push(crew);
 
     T.sort((a, b) => b.level - a.level);
     const level = T.reduce((m, t) => Math.max(m, t.level), 0);
+    // A confirmed STOP from valid readings stands. Otherwise any required reading problem means we cannot assess.
+    const status = level === 2 ? 'STOP' : problems.length ? 'UNABLE' : NAMES[level];
 
     // What a single ground level station would conclude: wind speed at one height only.
-    let g = { status: 'GO', text: 'Wind ' + f1(r.wLo) + ' mph at ' + lo + ' is inside ' + cfg.windMin + ' to ' + cfg.windMax + ' mph. Looks fine.' };
-    if (r.wLo > cfg.windMax) g = { status: 'STOP', text: 'Wind ' + f1(r.wLo) + ' mph at ' + lo + ' is over ' + cfg.windMax + ' mph.' };
+    let g;
+    if (!V.wLo) g = { status: 'UNABLE', text: 'No valid wind reading at ' + lo + '.' };
+    else if (r.wLo > cfg.windMax) g = { status: 'STOP', text: 'Wind ' + f1(r.wLo) + ' mph at ' + lo + ' is over ' + cfg.windMax + ' mph.' };
     else if (r.wLo < cfg.windMin) g = { status: 'CAUTION', text: 'Wind ' + f1(r.wLo) + ' mph at ' + lo + ' is under ' + cfg.windMin + ' mph.' };
+    else g = { status: 'GO', text: 'Wind ' + f1(r.wLo) + ' mph at ' + lo + ' is inside ' + cfg.windMin + ' to ' + cfg.windMax + ' mph. Wind check passed.' };
 
-    // Whole block or only part? If the ONLY issue is a site or crew downwind, the interior can be sprayed
-    // while the edge rows facing that site are held back. Any other flag means the whole block waits.
-    let plan = { mode: level === 0 ? 'all' : level === 1 ? 'marginal' : 'none', holds: [] };
-    if (level === 1 && T.every(t => t.code === 'SITE_DOWNWIND' || t.code === 'NET_CREW')) plan = { mode: 'partial', holds: T.map(t => ({ bearing: t.bearing, who: t.who })) };
-
-    return {
-      plan,
-      status: NAMES[level], level, triggers: T, dT, shearSpd, shearDir: shearDirDeg,
-      ground: g, missed: level > RANK[g.status]
-    };
+    return { status, level: status === 'UNABLE' ? -1 : level, triggers: T, problems, dT, shearSpd, shearDir: shearDirDeg, dirReliable,
+      ground: g, missed: g.status === 'GO' && (status === 'CAUTION' || status === 'STOP') };
   }
 
-  /* Contiguous GO runs in a series of evaluated points. stepMin = minutes per point. */
+  /* Contiguous GO runs. Each run reports whether it was cut off by the end of the data. */
   function goWindows(evals, stepMin) {
     const out = []; let s = -1;
     for (let i = 0; i <= evals.length; i++) {
       const go = i < evals.length && evals[i].status === 'GO';
       if (go && s < 0) s = i;
-      if (!go && s >= 0) { out.push({ start: s, end: i, hours: (i - s) * stepMin / 60 }); s = -1; }
+      if (!go && s >= 0) { out.push({ start: s, end: i, hours: (i - s) * stepMin / 60, openEnded: i === evals.length }); s = -1; }
     }
     return out;
   }
 
-  const api = { DEFAULT_CFG, evaluate, goWindows, compass, angDiff, f1, RANK, NAMES };
+  /* Is there enough projected suitable weather for the planned job, starting now?
+     A current STOP always wins. Unknown future conditions are never reported as a confirmed window. */
+  function jobAssessment(evals, idx, stepMin, jobHours) {
+    const need = jobHours * 60, cur = evals[idx].status;
+    let n = 0; while (idx + n < evals.length && evals[idx + n].status === 'GO') n++;
+    const runMin = n * stepMin, ranOut = idx + n >= evals.length;
+    const next = goWindows(evals, stepMin).find(w => w.start > idx && w.hours * 60 >= need) || null;
+    let state;
+    if (cur === 'STOP') state = 'STOP';
+    else if (cur === 'UNABLE') state = 'UNKNOWN';
+    else if (cur === 'CAUTION') state = 'WAIT';
+    else if (runMin >= need) state = 'SUFFICIENT';
+    else if (ranOut) state = 'UNKNOWN';       // still GO when the data ends: the rest of the job is not known
+    else state = 'WAIT';
+    return { state, current: cur, runMin, needMin: need, ranOut, next };
+  }
+
+  const api = { DEFAULT_CFG, evaluate, validateCfg, goWindows, jobAssessment, compass, angDiff, f1, RANK, NAMES };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   root.SprayEngine = api;
 })(typeof window !== 'undefined' ? window : globalThis);

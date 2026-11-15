@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="theme-color" content="#1f3d2b">
+<meta name="theme-color" content="#15212a">
 <title>Spray or Wait</title>
 <link rel="stylesheet" href="style.css">
 </head>
@@ -15,9 +15,9 @@
   </div>
   <div class="where">
     <div id="blockName">Block 7, lemons, Yuma County, Arizona</div>
-    <div class="src" id="srcLabel">Simulated tower: sensors at 5 ft and 30 ft, reading every 5 min</div>
+    <div class="src"><span class="srcTag" id="srcTag">Simulated tower readings</span> <span id="srcLabel"></span></div>
   </div>
-  <div class="clock"><div id="clock">6:10 AM</div><div class="src">orchard time</div></div>
+  <div class="clock"><div id="clock">6:10 AM</div><div class="src" id="clockSub">measurement time, MST</div></div>
 </header>
 
 <div id="alertBar" class="alertbar" hidden></div>
@@ -26,35 +26,35 @@
   <section class="hero">
     <div class="status" id="statusCard">
       <div class="statusrow">
-        <div class="light" id="light"></div>
         <div>
+          <div class="plateLabel">Current weather</div>
           <div class="word" id="statusWord">STOP</div>
           <div class="action" id="statusAction"></div>
         </div>
       </div>
-      <h3>Why</h3>
       <ul class="reasons" id="reasons"></ul>
       <div class="ground" id="groundBox">
-        <div class="gtitle">A single ground station would say</div>
+        <div class="gtitle">Ground station comparison: wind at 5 ft only</div>
         <div class="gverdict"><span class="pill" id="groundPill">GO</span><span id="groundText"></span></div>
         <div class="gmiss" id="groundMiss"></div>
       </div>
     </div>
+    <div class="jobstrip" id="jobStrip"></div>
+  </section>
 
-    <div class="scene">
-      <svg id="tower" viewBox="0 0 560 330" role="img" aria-label="Orchard cross section with sensors at two heights"></svg>
-      <div class="sceneSide">
-        <svg id="compass" viewBox="0 0 220 220" role="img" aria-label="Where drift would travel"></svg>
-        <div class="legend"><span class="k lo"></span>5 ft wind <span class="k hi"></span>30 ft wind</div>
-        <div class="mini" id="miniStats"></div>
-        <div class="blk"><div class="blkT">Whole block or part</div><svg id="blockMap" viewBox="0 0 212 144" role="img" aria-label="Which rows to spray now"></svg><div id="blockTxt" class="blkTxt"></div></div>
-      </div>
+  <section class="scene">
+    <svg id="tower" viewBox="0 0 560 330" role="img" aria-label="Orchard cross section with sensor readings at two heights"></svg>
+    <div class="sceneSide">
+      <svg id="compass" viewBox="0 0 220 220" role="img" aria-label="Potential downwind direction at each height"></svg>
+      <div class="legend"><span class="k lo"></span>5 ft wind <span class="k hi"></span>30 ft wind</div>
+      <div class="mini" id="miniStats"></div>
+      <div class="blk"><div class="blkT">Sensitive area proximity</div><svg id="blockMap" viewBox="0 0 212 150" role="img" aria-label="Illustration of where the sensitive site sits relative to the block"></svg><div id="blockTxt" class="blkTxt"></div></div>
     </div>
   </section>
 
   <section class="card timeline">
     <div class="tlhead">
-      <h2>Today in this block</h2>
+      <h2>Scenarios and timeline</h2>
       <div class="controls">
         <button id="play" class="btn primary">Play</button>
         <select id="speed" aria-label="Playback speed">
@@ -62,62 +62,50 @@
           <option value="350" selected>15 min per second</option>
           <option value="120">40 min per second</option>
         </select>
-        <span class="jumpl">Jump to</span>
-        <button class="btn jump" data-min="370">6:10 AM hidden inversion</button>
-        <button class="btn jump" data-min="660">11:00 AM good window</button>
-        <button class="btn jump" data-min="900">3:00 PM spray, then wind aloft</button>
-        <button class="btn jump" data-min="1075">5:55 PM evening inversion</button>
+        <button id="demoReset" class="btn">Reset demo</button>
       </div>
+    </div>
+    <div class="scen">
+      <button class="btn jump" data-min="370"><b>Hidden inversion</b><span>6:10 AM. Ground wind looks acceptable.</span></button>
+      <button class="btn jump" data-min="660"><b>Suitable at both heights</b><span>11:00 AM. All measured checks pass.</span></button>
+      <button class="btn jump" data-min="975"><b>Upper wind risk</b><span>4:15 PM. Ground reading misses it.</span></button>
+      <button class="btn jump" data-min="1060" data-play="STOP"><b>Watch the evening deteriorate</b><span>Plays from 5:40 PM through CAUTION to STOP.</span></button>
     </div>
     <svg id="tl" viewBox="0 0 1000 300" preserveAspectRatio="none"></svg>
     <div class="tlfoot" id="tlfoot"></div>
   </section>
 
-  <section class="simple" id="report">
+  <section class="simple">
     <div class="card act">
-      <h2>1. Spray</h2>
+      <h2>Monitoring</h2>
       <div id="sessionBox" class="sessionBox"></div>
       <button id="sprayBtn" class="btn primary big">Start spraying</button>
-      <h2 class="mt">2. Sign your report</h2>
-      <div id="fileBox" class="fileBox"><div class="muted">When you finish, your application report is filled in from the tower record. You sign it and it is filed.</div></div>
+      <div class="muted small" id="rulesLine"></div>
     </div>
     <div class="card">
-      <div class="tlhead"><h2>Grower heatmap</h2><div class="muted small" id="heatState"></div></div>
-      <div class="heatwrap">
-        <svg id="heatMap" viewBox="0 0 320 320" role="img" aria-label="Heatmap of grower reports near this block"></svg>
-        <div class="quick">
-          <div class="qt">See something? One tap tells growers nearby.</div>
-          <button class="qbtn q1" data-kind="inversion">Air not moving<small>smoke or dust hanging flat</small></button>
-          <button class="qbtn q2" data-kind="drift">I saw drift</button>
-          <button class="qbtn q3" data-kind="crew">Crew in field</button>
-          <div class="heatleg"><i></i><span>few reports</span><span>many</span></div>
-          <div id="quickMsg" class="muted small"></div>
-        </div>
-      </div>
+      <div class="tlhead"><h2>Recent alerts</h2><a href="#recordSec" id="openRecord" class="lnk">Open the full record</a></div>
+      <ul id="recent" class="recent"></ul>
     </div>
   </section>
 
-  <div class="moreBar"><button id="moreBtn" class="btn">Show details</button><span class="muted small">Settings, forecast, pest guide, grower network and the full spray record</span></div>
-  <div id="more" hidden>
-  <section class="grid3">
-    <div class="card">
-      <h2>Next safe window</h2>
-      <div id="windowBox" class="windowBox"></div>
-    </div>
-
-    <div class="card">
-      <h2>This job</h2>
+  <details class="sec" id="rulesSec">
+    <summary><b>Decision rules and job settings</b><span>Active thresholds, product, sensitive site, data import</span></summary>
+    <div class="secBody">
+      <div class="rules" id="rulesBox"></div>
+      <div id="cfgErr" class="cfgErr" hidden></div>
       <div class="form">
         <label class="wide">What are you spraying (from your PCA recommendation)
           <select id="cfgProf"><option value="custom">Custom (set below)</option><option value="oil">Horticultural oil</option><option value="sulfur">Sulfur</option><option value="contact">Contact insecticide, low volatility</option><option value="volatile">Volatile herbicide on the orchard floor</option></select>
           <span id="profNote" class="profNote"></span>
         </label>
         <label>Product volatility
-          <select id="cfgVol"><option value="low">Low</option><option value="medium">Medium</option><option value="high">High (vapor can drift after spraying)</option></select>
+          <select id="cfgVol"><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option></select>
         </label>
-        <label>Label wind minimum (mph)<input id="cfgMin" type="number" step="0.5" min="0" max="10"></label>
-        <label>Label wind maximum (mph)<input id="cfgMax" type="number" step="0.5" min="3" max="25"></label>
-        <label>Job length (hours)<input id="cfgJob" type="number" step="0.5" min="0.5" max="12"></label>
+        <label>Planned job length (hours)<input id="cfgJob" type="number" step="0.5" min="0.5" max="24"></label>
+        <label>Label wind minimum (mph)<input id="cfgMin" type="number" step="0.5" min="0" max="30"></label>
+        <label>Label wind maximum (mph)<input id="cfgMax" type="number" step="0.5" min="1" max="60"></label>
+        <label>Speed difference to flag (mph), prototype threshold<input id="cfgShS" type="number" step="0.5" min="0.5" max="30"></label>
+        <label>Direction difference to flag (degrees), prototype threshold<input id="cfgShD" type="number" step="5" min="5" max="180"></label>
         <label>Sensitive site nearby
           <select id="cfgSiteOn"><option value="1">Yes</option><option value="0">None</option></select>
         </label>
@@ -125,93 +113,119 @@
         <label>Which side of the block
           <select id="cfgSiteDir"><option value="0">North</option><option value="45">Northeast</option><option value="90">East</option><option value="135">Southeast</option><option value="180">South</option><option value="225">Southwest</option><option value="270">West</option><option value="315">Northwest</option></select>
         </label>
-        <label>Speed difference to flag (mph)<input id="cfgShS" type="number" step="0.5" min="1" max="20"></label>
-        <label>Direction difference to flag (degrees)<input id="cfgShD" type="number" step="5" min="10" max="180"></label>
-        <label>Edge rows to hold near a site (of 12)<input id="cfgBuf" type="number" step="1" min="1" max="6"></label>
       </div>
       <div class="row wrap">
         <label class="chk"><input type="checkbox" id="optSound" checked> Sound on alerts</label>
-        <label class="chk"><input type="checkbox" id="optPush"> Push notifications</label>
+        <label class="chk"><input type="checkbox" id="optPush"> Browser notifications (only while this page is open)</label>
+        <label class="chk"><input type="checkbox" id="optDropHi"> Test: disconnect the 30 ft sensor</label>
       </div>
       <div class="row wrap">
-        <label class="btn file">Load tower CSV<input id="csvIn" type="file" accept=".csv,text/csv" hidden></label>
+        <label class="btn file">Import tower CSV<input id="csvIn" type="file" accept=".csv,text/csv" hidden></label>
         <button id="csvSample" class="btn">Download sample CSV</button>
-        <button id="resetBtn" class="btn">Reset</button>
+        <button id="resetBtn" class="btn">Restore default settings and simulated data</button>
       </div>
     </div>
+  </details>
 
-    <div class="card">
-      <h2>Real forecast outlook, next 72 hours</h2>
+  <details class="sec" id="fcSec">
+    <summary><b>Regional model forecast</b><span>Planning only. Different heights than the tower</span></summary>
+    <div class="secBody">
       <div class="row">
         <input id="lat" type="number" step="0.01" aria-label="Latitude" value="32.69">
         <input id="lon" type="number" step="0.01" aria-label="Longitude" value="-114.62">
-        <button id="fcBtn" class="btn">Load</button>
+        <button id="fcBtn" class="btn">Load forecast</button>
       </div>
-      <div id="fcBox" class="fcBox"><div class="muted">Loading forecast…</div></div>
-      <div class="muted small">Planning only. Weather model values near the ground and about 260 ft up (Open-Meteo). A model is coarser than a tower in the block, which is why the live call above uses the tower.</div>
+      <div id="fcBox" class="fcBox"><div class="muted">Not loaded yet.</div></div>
+      <div class="muted small"><span class="srcTag light">Regional model forecast</span> Open-Meteo weather model: temperature at 2 m (about 6 ft) and 80 m (about 260 ft), wind at 10 m (about 33 ft). These are not the tower heights and a regional model does not resolve one orchard block. It cannot replace measurements in the orchard. Only the inversion check, the ground wind limits and the sensitive site check are applied to it.</div>
     </div>
-  </section>
+  </details>
 
-  <section class="card">
-    <div class="tlhead"><h2>Arizona citrus pest guide</h2>
-      <div class="controls"><label class="chk">What did scouting find <select id="pestSel"></select></label></div></div>
-    <div class="pest" id="pestBox"></div>
-    <div class="muted small">Paraphrased from University of Arizona Cooperative Extension and UC IPM. A reference for the conversation with your PCA, not a prescription. The PCA writes the recommendation and the label is the law.</div>
-  </section>
+  <details class="sec" id="fileSec">
+    <summary><b>Application record and signature</b><span>Filled in from the tower readings when a job ends</span></summary>
+    <div class="secBody twocol">
+      <div><h3 class="h3top">This job</h3><div id="fileBox" class="fileBox"></div></div>
+      <div><h3 class="h3top">Saved application records</h3><div class="muted small">Saved in this browser only (local storage). They stay after a reload on this device and are not on any server.</div><ul id="savedList" class="recent"></ul></div>
+    </div>
+  </details>
 
-  <section class="card" id="network">
-    <div class="tlhead"><h2>Grower network</h2><div class="muted small" id="netState">Connecting…</div></div>
-    <div class="net">
-      <svg id="netMap" viewBox="0 0 240 240" role="img" aria-label="Reports near this block"></svg>
-      <div>
-        <h3 class="h3top">What growers nearby are reporting</h3>
-        <ul id="netFeed" class="feed"></ul>
-      </div>
-      <div class="repform">
-        <h3 class="h3top">Report from the field</h3>
-        <label>What do you see
-          <select id="repKind"><option value="inversion">Inversion signs (smoke or dust hanging flat, ground fog)</option><option value="drift">I saw spray drift</option><option value="crew">Crew working in the field</option><option value="spraying">I am spraying now</option></select>
-        </label>
-        <div class="row">
-          <label>Where<select id="repDist"><option value="0">At my block</option><option value="0.5" selected>0.5 mi away</option><option value="1">1 mi away</option><option value="2">2 mi away</option></select></label>
-          <label>Direction<select id="repDir"><option value="0">North</option><option value="90" selected>East</option><option value="180">South</option><option value="270">West</option></select></label>
+  <details class="sec" id="recordSec">
+    <summary><b>Full record</b><span>Every reading, alert and event this session, with CSV export</span></summary>
+    <div class="secBody">
+      <div class="tlhead">
+        <div class="muted small"><span class="srcTag light">Demo session record</span> Kept in memory for this session. It is cleared by a reload or by Reset demo. Export the CSV to keep it.</div>
+        <div class="controls">
+          <label class="chk"><input type="checkbox" id="logAlerts"> Alerts and events only</label>
+          <button id="logCsv" class="btn">Export CSV</button>
         </div>
-        <label>Note (optional)<input id="repNote" type="text" maxlength="140" placeholder="Example: dust from the road is hanging flat"></label>
-        <div class="row"><button id="repBtn" class="btn primary">Share report</button><span id="repMsg" class="muted small"></span></div>
-        <div class="muted small">No names and no products. Location is rounded to about 300 ft and reports expire after 48 hours. Reports are unverified, so they can only add caution. They never turn a STOP into a GO.</div>
+      </div>
+      <div class="note"><label for="noteIn">Applicator note (goes in the record)</label>
+        <div class="row"><input id="noteIn" type="text" placeholder="Example: checked on site, smoke moving south"><button id="noteBtn" class="btn">Add</button></div></div>
+      <div class="logwrap">
+        <table id="log"><thead><tr>
+          <th>Measured</th><th>Event</th><th>Weather</th><th>Ground only</th><th>5 ft °F</th><th>30 ft °F</th><th>Diff</th><th>5 ft wind</th><th>30 ft wind</th><th>Reasons</th>
+        </tr></thead><tbody></tbody></table>
       </div>
     </div>
-  </section>
+  </details>
 
-  <section class="card">
-    <div class="tlhead">
-      <h2>Spray record</h2>
-      <div class="controls">
-        <label class="chk"><input type="checkbox" id="logAlerts"> Alerts and events only</label>
-        <button id="logCsv" class="btn">Export CSV</button>
-        <button id="logClear" class="btn">Clear</button>
+  <details class="sec" id="netSec">
+    <summary><b>Grower network</b><span>Community reports near this block</span></summary>
+    <div class="secBody">
+      <div class="heatwrap">
+        <div>
+          <svg id="heatMap" viewBox="0 0 320 320" role="img" aria-label="Map of community reports near this block"></svg>
+          <div class="heatleg"><i></i><span>few reports</span><span>many</span></div>
+          <div class="muted small" id="heatState"></div>
+        </div>
+        <div class="quick">
+          <div class="qt">See something? One tap tells growers nearby.</div>
+          <button class="qbtn q1" data-kind="inversion">Air not moving<small>smoke or dust hanging flat</small></button>
+          <button class="qbtn q2" data-kind="drift">I saw drift</button>
+          <button class="qbtn q3" data-kind="crew">Crew in field</button>
+          <div id="quickMsg" class="muted small"></div>
+          <h3>Actual community reports</h3>
+          <ul id="netFeed" class="feed"></ul>
+          <div class="muted small">Reports go to a shared database with no name and no product. Location is rounded to about 300 ft. Reports are unverified, so they can only add caution to the weather call. They never remove a flag.</div>
+        </div>
       </div>
     </div>
-    <div class="note"><label for="noteIn">Applicator note (goes in the record)</label>
-      <div class="row"><input id="noteIn" type="text" placeholder="Example: checked smoke bomb, drift moving south"><button id="noteBtn" class="btn">Add</button></div></div>
-    <div class="logwrap">
-      <table id="log"><thead><tr>
-        <th>Time</th><th>Event</th><th>Status</th><th>Ground only</th><th>5 ft °F</th><th>30 ft °F</th><th>Diff</th><th>5 ft wind</th><th>30 ft wind</th><th>What triggered it</th>
-      </tr></thead><tbody></tbody></table>
-    </div>
-  </section>
+  </details>
 
-  </div>
+  <details class="sec" id="pestSec">
+    <summary><b>Arizona citrus pest guide</b><span>Reference from University of Arizona Extension</span></summary>
+    <div class="secBody">
+      <div class="row"><label class="chk">What did scouting find <select id="pestSel"></select></label></div>
+      <div class="pest" id="pestBox"></div>
+      <div class="muted small">Paraphrased from University of Arizona Cooperative Extension and UC IPM. A reference for the conversation with your PCA, not a prescription. The PCA writes the recommendation and the label is the law.</div>
+    </div>
+  </details>
+
+  <details class="sec" id="waitSec">
+    <summary><b>Join the waitlist</b><span>Get told when Spray or Wait is ready for a real tower</span></summary>
+    <div class="secBody twocol">
+      <div>
+        <div class="form one">
+          <label>Email<input id="wlEmail" type="text" inputmode="email" autocomplete="email" maxlength="120" placeholder="you@farm.com"></label>
+          <label>I am a
+            <select id="wlRole"><option value="grower">Grower</option><option value="applicator">Applicator</option><option value="pca">Pest Control Adviser</option><option value="other">Something else</option></select>
+          </label>
+        </div>
+        <div class="row"><button id="wlBtn" class="btn primary">Join the waitlist</button><span id="wlMsg" class="muted small"></span></div>
+        <div class="muted small">We store your email and role to contact you about Spray or Wait. Nothing else.</div>
+      </div>
+      <div class="qr"><div id="qrBox"></div><div class="muted small">Scan to open Spray or Wait on your phone</div></div>
+    </div>
+  </details>
 
   <footer>
-    Spray or Wait supports the applicator's decision. It does not replace the pesticide label, on site checks or regulations, and no system can guarantee zero drift. Wind limits of 3 to 10 mph are common guidance and every limit here can be set to match the label. Tower data in this demo is simulated.
+    Spray or Wait supports the applicator's decision. It does not replace the pesticide label, on site checks or regulations, and no system can guarantee zero drift. One tower describes conditions at the tower, not everywhere in the orchard. Tower readings in this demonstration are simulated. <span id="build"></span>
   </footer>
 </main>
 <div id="printDoc"></div>
-<button id="fab" class="fab" type="button">Report</button>
 <script src="engine.js"></script>
 <script src="sim.js"></script>
 <script src="pests.js"></script>
+<script src="qr.js"></script>
 <script src="app.js"></script>
 </body>
 </html>
