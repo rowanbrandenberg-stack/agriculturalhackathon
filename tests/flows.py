@@ -49,7 +49,7 @@ async def main():
         js = await txt('#jobStrip')
         ck('3:00 PM current weather GO', s['time']=='3:00 PM' and s['status']=='GO', s)
         ck('3:00 PM planned job WAIT, too little weather left for a 2 hour job', 'WAIT' in js and 'Only 20 minutes of projected suitable weather remain for this 2 hour job' in js, js)
-        ck('window source is labelled as a simulated demonstration', 'known simulated day' in js and 'not a forecast' in js)
+        ck('window source is labelled as a simulated demonstration', 'simulated demo day' in js and 'not a forecast' in js)
         await pg.click('.jump[data-min="975"]'); await pg.wait_for_timeout(200); s = await st()
         ck('scenario 3 upper wind STOP, ground GO at 4:15 PM', s['status']=='STOP' and s['ground']=='GO' and 'Wind above your limit at 30 ft' in await tc('#reasons'), s)
         await pg.click('.jump[data-min="1060"]'); await pg.wait_for_timeout(300); s0 = await st()

@@ -26,6 +26,13 @@
 
 <div id="alertBar" class="alertbar" hidden></div>
 
+<nav id="pages" class="pages" role="tablist" aria-label="Pages" hidden>
+  <button role="tab" data-page="now" class="on">Now</button>
+  <button role="tab" data-page="plan">Plan a job</button>
+  <button role="tab" data-page="records">Records</button>
+  <button role="tab" data-page="community">Community</button>
+  <button role="tab" data-page="guide">Crop guide</button>
+</nav>
 <main>
   <section class="hero">
     <div class="status" id="statusCard">
@@ -64,7 +71,7 @@
 
   <section class="card timeline">
     <div class="tlhead">
-      <h2>Scenarios and timeline</h2>
+      <h2 id="tlTitle">Jump to a moment in the day</h2>
       <div class="controls">
         <button id="play" class="btn primary">Play</button>
         <select id="speed" aria-label="Playback speed">
@@ -129,12 +136,12 @@
         <label>Tower cost per year, $ <input type="number" id="svTower" value="1900" min="0" step="50"></label>
       </div>
       <div id="svOut" class="svOut"></div>
-      <div class="muted small">Every figure above is yours to change. The starting values are illustrations, not data: we have not measured how often jobs are started in unsuitable weather. The tower figure is our own estimate ($4,500 installed plus $400 a year, over three years). This leaves out the cost of a drift claim or damage to a neighbor, which can be far larger and which we cannot estimate.</div>
+      <div class="muted small">Change any number. The starting numbers are examples, not measured data. Tower cost is our own estimate ($4,500 installed plus $400 a year, over three years). A drift claim or damage to a neighbor is not counted and can cost far more.</div>
     </div>
   </details>
 
   <details class="sec" id="rulesSec">
-    <summary><b>Decision rules and job settings</b><span>Active thresholds, product, sensitive site, data import</span></summary>
+    <summary><b>Rules and settings</b><span>The limits behind each call, and your job details</span></summary>
     <div class="secBody">
       <div class="rules" id="rulesBox"></div>
       <div id="cfgErr" class="cfgErr" hidden></div>
@@ -183,7 +190,7 @@
         <button id="fcBtn" class="btn">Load forecast</button>
       </div>
       <div id="fcBox" class="fcBox"><div class="muted">Not loaded yet.</div></div>
-      <div class="muted small"><span class="srcTag light">Regional model forecast</span> Open-Meteo weather model: temperature at 2 m (about 6 ft) and 80 m (about 260 ft), wind at 10 m (about 33 ft). These are not the tower heights and a regional model does not resolve one orchard block. It cannot replace measurements in the orchard. Only the inversion check, the ground wind limits and the sensitive site check are applied to it.</div>
+      <div class="muted small"><span class="srcTag light">Regional model forecast</span> Open-Meteo weather model: temperature at 2 m (about 6 ft) and 80 m (about 260 ft), wind at 10 m (about 33 ft). Those are not the tower heights, and a regional model cannot see one orchard block. Use it to plan, not to decide. Only the inversion check, the ground wind limits and the sensitive site check are applied to it.</div>
     </div>
   </details>
 
@@ -196,7 +203,7 @@
     <summary><b>Application record and signature</b><span>Filled in from the tower readings when a job ends</span></summary>
     <div class="secBody twocol">
       <div><h3 class="h3top">This job</h3><div id="fileBox" class="fileBox"></div></div>
-      <div><h3 class="h3top">Saved application records</h3><div class="muted small">Saved in this browser only (local storage). They stay after a reload on this device and are not on any server.</div><ul id="savedList" class="recent"></ul></div>
+      <div><h3 class="h3top">Saved application records</h3><div class="muted small">Saved on this device only. Not sent to any server.</div><ul id="savedList" class="recent"></ul></div>
     </div>
   </details>
 
@@ -204,7 +211,7 @@
     <summary><b>Full record</b><span>Every reading, alert and event this session, with CSV export</span></summary>
     <div class="secBody">
       <div class="tlhead">
-        <div class="muted small"><span class="srcTag light">Demo session record</span> Kept in memory for this session. It is cleared by a reload or by Reset demo. Export the CSV to keep it.</div>
+        <div class="muted small"><span class="srcTag light">Demo session record</span> Cleared when you reload or reset the demo. Export the CSV to keep it.</div>
         <div class="controls">
           <label class="chk"><input type="checkbox" id="logAlerts"> Alerts and events only</label>
           <button id="logCsv" class="btn">Export CSV</button>
@@ -227,7 +234,7 @@
         <select id="nbrSide"><option value="0">north</option><option value="45">northeast</option><option value="90" selected>east</option><option value="135">southeast</option><option value="180">south</option><option value="225">southwest</option><option value="270">west</option><option value="315">northwest</option></select>
         side of this block</label></div>
       <div id="nbrBox" class="nbr"></div>
-      <div class="muted small">Why this exists: growers we met at a Tucson farmers market told us organic farms move far out to avoid overspray, and that they would want to know what is happening near their land and water. This is a notice built from the tower readings and the applicator's own start button. Wind measured at one tower does not establish where droplets or vapor travel, so this is not a drift map.</div>
+      <div class="muted small">Why this exists: growers we met at a Tucson farmers market told us they want to know what is happening near their land and water. This notice comes from the tower readings and the applicator's start button. One tower cannot show where spray travels, so this is not a drift map.</div>
     </div>
   </details>
 
@@ -244,7 +251,7 @@
           <div id="quickMsg" class="muted small"></div>
           <h3>Actual community reports</h3>
           <ul id="netFeed" class="feed"></ul>
-          <div class="muted small">Reports go to a shared database with no name and no product. Location is rounded to about 300 ft. Reports are unverified, so they can only add caution to the weather call. They never remove a flag.</div>
+          <div class="muted small">Reports carry no name and no product, and location is rounded to about 300 ft. Nobody verifies them, so they can only add caution. They never clear a flag.</div>
         </div>
       </div>
     </div>

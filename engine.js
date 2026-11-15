@@ -84,7 +84,7 @@
     // 1. Inversion. Any positive difference is an alert.
     if (dT != null && dT > 0) {
       T.push({ code: 'INVERSION', level: 2, title: 'Temperature inversion',
-        text: 'Air at ' + hi + ' is ' + f1(dT) + '°F warmer than at ' + lo + '. Upper air warmer than lower air is an inversion. Fine droplets and vapor can stay in a shallow layer and travel sideways.' +
+        text: 'Air at ' + hi + ' is ' + f1(dT) + '°F warmer than at ' + lo + '. That is an inversion. The warm air acts like a lid, so fine spray can hang under it and drift sideways.' +
           (dT < cfg.sensorUnc ? ' This difference is inside the ±' + cfg.sensorUnc + '°F ' + unc + ', so it may not be a true inversion. The alert is shown anyway because a positive difference is never ignored.' : '') });
     } else if (dT != null && dT > -cfg.sensorUnc) {
       T.push({ code: 'SMALL_DIFF', level: 1, title: 'Small temperature difference',
@@ -98,7 +98,7 @@
     if (needHiWind && V.wHi && r.wHi > cfg.windMax) T.push({ code: 'WIND_HIGH_HI', level: 2, title: 'Wind above your limit at ' + hi,
       text: 'Wind at ' + hi + ' is ' + f1(r.wHi) + ' mph. Your limit is ' + cfg.windMax + ' mph. A reading at ' + loW + ' alone does not show this.' });
     if (V.wLo && r.wLo < cfg.windMin) T.push({ code: 'WIND_LOW_LO', level: 1, title: 'Wind below your minimum at ' + loW,
-      text: 'Wind at ' + loW + ' is ' + f1(r.wLo) + ' mph. Your minimum is ' + cfg.windMin + ' mph. Direction is unreliable in near calm air, and calm conditions can accompany an inversion.' });
+      text: 'Wind at ' + loW + ' is ' + f1(r.wLo) + ' mph. Your minimum is ' + cfg.windMin + ' mph. Calm air has no steady direction and often comes with an inversion.' });
     if (needHiWind && V.wHi && r.wHi < cfg.windMin) T.push({ code: 'WIND_LOW_HI', level: 1, title: 'Wind below your minimum at ' + hi,
       text: 'Wind at ' + hi + ' is ' + f1(r.wHi) + ' mph. Your minimum is ' + cfg.windMin + ' mph.' });
 
@@ -139,7 +139,7 @@
 
     // 6c. Network check (live model mode): kriging across the whole network says inversion at this site while the site estimate does not.
     if (nb && nb.net && nb.net.v > 0 && !T.some(t => t.code === 'INVERSION' || t.code === 'NEARBY_INVERSION')) T.push({ code: 'NETWORK_INVERSION', level: 1, title: 'The network model shows an inversion here',
-      text: 'Kriging across ' + nb.net.n + ' network points puts the upper air ' + f1(nb.net.v) + '°F warmer than the lower air at this site, while the farm estimate does not. The two estimates disagree. Check on site.' });
+      text: 'The network estimate (kriging across ' + nb.net.n + ' points) puts the upper air ' + f1(nb.net.v) + '°F warmer than the lower air at this site, while the farm estimate does not. The two estimates disagree. Check on site.' });
 
     // 7. Actual community reports nearby. Unverified, so they can only ADD caution.
     const comm = cfg.community || [];

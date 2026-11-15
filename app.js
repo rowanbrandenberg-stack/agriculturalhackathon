@@ -3,7 +3,7 @@
   const E = window.SprayEngine, S = window.SpraySim;
   const $ = id => document.getElementById(id);
   const f1 = E.f1;
-  const BUILD = '2026-11-15.18';
+  const BUILD = '2026-11-15.20';
   /* Live mode: a real location, real model weather. Rounded coordinates for the area, not the farm's address. No tower is installed there. */
   const FARM = { name: 'SouthWinds Farm area', place: 'near Benson, Arizona', lat: 31.97, lon: -110.29 };
   const BLOCK_SIM = 'Block 7, lemons, Yuma County, Arizona';
@@ -150,10 +150,10 @@
     if (j.state !== 'SUFFICIENT') nxt = j.next ? 'Projected suitable weather window: ' + tm(series[j.next.start].min) + ' to ' + tm(series[j.next.start].min + j.next.hours * 60) + ' (' + durWords(j.next.hours * 60) + ').' + (nC ? ' ' + CONCERN_NOTE : '')
       : 'No later window of ' + durWords(j.needMin) + ' is projected in this data.';
     if (cfg.jobCost > 0 && j.state !== 'SUFFICIENT') nxt += ' Product cost you entered for this job: $' + Math.round(cfg.jobCost).toLocaleString('en-US') + '. That is what a wasted application puts at stake.';
-    const src = source.kind === 'sim' ? 'Projection source: the remaining samples of a known simulated day. This is a demonstration, not a forecast.' : isLive() ? 'Projection source: the regional model forecast for the hours ahead (Open-Meteo). A forecast for the area, not a measurement at the farm, and no replacement for readings in the field.' : 'Projection source: later rows of the imported file. This is not a forecast.';
+    const src = source.kind === 'sim' ? 'Taken from the rest of the simulated demo day. A demonstration, not a forecast.' : isLive() ? 'Projection source: the regional model forecast for the hours ahead (Open-Meteo). A forecast for the area, not a measurement at the farm, and no replacement for readings in the field.' : 'Projection source: later rows of the imported file. This is not a forecast.';
     const cPill = nC ? (ev.concerns.some(c => c.level === 2) ? 'STOP' : 'CAUTION') : 'NONE';
     $('jobStrip').className = 'jobstrip ' + cls;
-    $('jobStrip').innerHTML = '<div class="jl"><span class="jk">Current weather</span><span class="pill ' + ev.weather + '">' + ev.weather + '</span><span class="jt">Temperature, wind, inversion' + (isLive() ? '' : ' and shear') + ' checks only.</span></div>' +
+    $('jobStrip').innerHTML = '<div class="jl"><span class="jk">Current weather</span><span class="pill ' + ev.weather + '">' + ev.weather + '</span><span class="jt">Temperature, wind and inversion checks only.</span></div>' +
       '<div class="jl"><span class="jk">Site concerns</span><span class="pill ' + cPill + '">' + (nC ? nC + ' OPEN' : 'NONE') + '</span><span class="jt">' + (nC ? esc(ev.concerns.map(c => c.title).join('; ')) + '.' : 'No sensitive site or community concern flagged for this reading.') + '</span></div>' +
       '<div class="jl"><span class="jk">Planned job</span><span class="pill ' + cls + '">' + tag + '</span><span class="jt">' + esc(txt) + ' ' + esc(nxt) + '</span></div>' +
       '<div class="jsrc">' + src + '</div>';
@@ -511,6 +511,7 @@
     $('blockName').textContent = isLive() ? FARM.name + ', ' + FARM.place + ' (example location)' : BLOCK_SIM;
     $('modeSim').classList.toggle('on', !isLive()); $('modeLive').classList.toggle('on', isLive());
     $('scen').hidden = isLive(); $('liveNow').hidden = !isLive(); $('demoReset').hidden = isLive();
+    $('play').hidden = isLive(); $('speed').hidden = isLive(); $('tlTitle').textContent = isLive() ? 'Today and tomorrow, hour by hour' : 'Jump to a moment in the day';
     $('liveNote').hidden = !isLive();
     document.querySelector('.gtitle').textContent = isLive() ? 'Ground only comparison: model wind near the ground' : 'Ground station comparison: wind at 5 ft only';
     if (isLive()) $('liveNote').innerHTML = '<span class="srcTag">Live regional model</span> Real weather model values for the ' + FARM.name + ' ' + FARM.place + ', fetched ' + source.fetched.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) + ' and refreshed every 10 minutes. Temperature at 2 m and 80 m, wind at 10 m and 80 m (Open-Meteo). ' + (livePts > 1 ? 'The site value is an inverse distance weighted estimate from ' + livePts + ' model points within ' + RING_KM + ' km, and the tool warns when those points disagree about an inversion.' + (liveNet ? ' A second model kriges ' + liveNet + ' network points across 40 km and is compared with the farm model below.' : '') : '') + ' <b>No tower is installed at the farm.</b> A regional model does not resolve one field, so treat this as the best available estimate until a two height tower is on site. Hours after now are forecast.';
@@ -836,9 +837,17 @@
   const liveBtn = on => { const b = $('modeLive'); b.disabled = on; b.textContent = on ? 'Loading live data…' : 'Live: ' + FARM.name; };
   /* Every load carries a request number. A reply is used only if no switch has happened since it was asked for,
      and nothing is evaluated or logged until the weather and the community feed for the new location are both in. */
+  // Speed: the page asks for live data in the background as soon as it opens, so the Live button has it ready.
+  // The community feed gets 3 seconds and the weather 15; a slow feed no longer holds up the weather.
+  const within = (p, ms) => Promise.race([p, new Promise((_, no) => setTimeout(() => no(new Error('timeout')), ms))]);
+  const loadLive = () => Promise.allSettled([within(fetchLive(), 15000), within(fetchReports(), 3000)]);
+  let pre = null;
+  const prefetch = () => { pre = { at: Date.now(), p: loadLive() }; };
   async function goLive() {
     const my = ++reqId; liveBtn(true);
-    const got = await Promise.allSettled([fetchLive(), fetchReports()]);
+    const warm = pre && Date.now() - pre.at < 600000 ? pre.p : null; pre = null;
+    let got = await (warm || loadLive());
+    if (warm && got[0].status !== 'fulfilled' && my === reqId) got = await loadLive();   // the early load failed: ask again
     if (my !== reqId) return;                                   // the user switched again: this reply is stale
     liveBtn(false);
     if (got[0].status !== 'fulfilled') { showAlert('CAUTION', 'Live data could not be loaded', 'The weather service did not answer, so nothing changed. You are still on the simulated demo day.'); return; }
@@ -876,7 +885,20 @@
   window.__sowRefresh = refreshLive;
 
   /* ---------- wire up ---------- */
-  function openSec(id) { const d = $(id); if (d) { d.open = true; d.scrollIntoView({ behavior: 'smooth', block: 'start' }); } }
+  // Pages: the same sections, grouped under five tabs so one screen shows one job.
+  const PAGES = { now: ['.hero', '.scene', '.jobwrap', '.timeline', '.simple'], plan: ['#jobSec', '#saveSec', '#fcSec', '#rulesSec'],
+    records: ['#fileSec', '#recordSec'], community: ['#nbrSec', '#netSec', '#modelSec', '#waitSec'], guide: ['#pestSec', '#chemSec'] };
+  let pagesOn = !navigator.webdriver, page = 'now';
+  function showPage(p, keepScroll) {
+    if (!PAGES[p]) p = 'now'; page = p;
+    Object.keys(PAGES).forEach(k => PAGES[k].forEach(sel => { const el = document.querySelector(sel); if (el) el.classList.toggle('pgHide', pagesOn && k !== p); }));
+    document.querySelectorAll('#pages button').forEach(b => { const on = b.dataset.page === p; b.classList.toggle('on', on); b.setAttribute('aria-selected', on ? 'true' : 'false'); });
+    $('pages').hidden = !pagesOn;
+    if (pagesOn && p !== 'now') { const first = PAGES[p].map(s => document.querySelector(s)).find(el => el && !el.hidden); if (first && !PAGES[p].some(s => { const el = document.querySelector(s); return el && el.open; })) first.open = true; }
+    if (pagesOn && !keepScroll) window.scrollTo(0, 0);
+  }
+  const pageOf = id => Object.keys(PAGES).find(k => PAGES[k].includes('#' + id)) || 'now';
+  function openSec(id) { const d = $(id); if (d) { showPage(pageOf(id), true); d.open = true; d.scrollIntoView({ behavior: 'smooth', block: 'start' }); } }
   function init() {
     $('build').textContent = 'Build ' + BUILD + '.';
     fillForm(); renderSource(); recompute(); setNow(); lastStatus = evals[idx].status; renderRules(); addLog('Reading'); renderAll(); renderFile();
@@ -921,8 +943,11 @@
     ['svAcres', 'svCost', 'svJobs', 'svBad', 'svLost', 'svTower'].forEach(id => $(id).addEventListener('input', renderSavings)); renderSavings();
     $('wlBtn').onclick = joinWaitlist; renderQr();
     renderNetwork(); pullNetwork(false); setInterval(() => pullNetwork(true), 8000);
+    document.querySelectorAll('#pages button').forEach(b => b.addEventListener('click', () => showPage(b.dataset.page)));
+    showPage('now', true);
+    if (!navigator.webdriver) setTimeout(prefetch, 600);   // automated checks control the network themselves
     if (/[?&]auto\b/.test(location.search)) togglePlay();   // add ?auto to the address to start the demo playing on load
-    window.__sow = { seek: i => jump(i), state: () => ({ idx: idx, time: fmtTime(series[idx].min), status: evals[idx].status, weather: evals[idx].weather, concerns: evals[idx].concerns.length, feed: netOnline, used: usedCommunity().length, ground: evals[idx].ground.status, logLen: log.length, playing: playing, source: source.kind, n: series.length, step: stepMin }) };
+    window.__sow = { seek: i => jump(i), pages: on => { pagesOn = on; showPage(page, true); }, page: () => page, state: () => ({ idx: idx, time: fmtTime(series[idx].min), status: evals[idx].status, weather: evals[idx].weather, concerns: evals[idx].concerns.length, feed: netOnline, used: usedCommunity().length, ground: evals[idx].ground.status, logLen: log.length, playing: playing, source: source.kind, n: series.length, step: stepMin }) };
   }
   init();
 })();
