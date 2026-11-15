@@ -31,30 +31,17 @@
     <div class="status" id="statusCard">
       <div class="statusrow">
         <div>
-          <div class="plateLabel">Current weather</div>
+          <div class="plateLabel">Application decision</div>
           <div class="word" id="statusWord">STOP</div>
           <div class="action" id="statusAction"></div>
         </div>
       </div>
-      <ul class="reasons" id="reasons"></ul>
+      <div class="why"><div class="split" id="splitLine"></div><ul class="reasons" id="reasons"></ul></div>
       <div class="ground" id="groundBox">
         <div class="gtitle">Ground station comparison: wind at 5 ft only</div>
         <div class="gverdict"><span class="pill" id="groundPill">GO</span><span id="groundText"></span></div>
         <div class="gmiss" id="groundMiss"></div>
       </div>
-    </div>
-    <div class="jobstrip" id="jobStrip"></div>
-    <div class="www">
-      <div class="wcol"><h3 class="wh">What</h3>
-        <div class="wpair"><div><label class="wlab" for="cropSel">Crop</label><select id="cropSel"></select></div>
-          <div><label class="wlab" for="pestPick">Pest found</label><select id="pestPick"></select></div></div>
-        <div id="chemBox" class="chems"></div>
-        <label class="wlab" for="whatSel">Spray type, from your PCA recommendation</label>
-        <select id="whatSel"></select>
-        <div id="whatNote" class="wtxt"></div>
-      </div>
-      <div class="wcol"><h3 class="wh">When</h3><div id="whenBox" class="wtxt"></div></div>
-      <div class="wcol"><h3 class="wh">How</h3><div id="howBox" class="wtxt"></div></div>
     </div>
   </section>
 
@@ -67,6 +54,8 @@
       <div class="blk"><div class="blkT">Sensitive area proximity</div><svg id="blockMap" viewBox="0 0 212 150" role="img" aria-label="Illustration of where the sensitive site sits relative to the block"></svg><div id="blockTxt" class="blkTxt"></div></div>
     </div>
   </section>
+
+  <section class="jobwrap"><div class="jobstrip" id="jobStrip"></div></section>
 
   <section class="card timeline">
     <div class="tlhead">
@@ -83,7 +72,6 @@
       </div>
     </div>
     <div id="liveNote" class="liveNote" hidden></div>
-    <div id="krigBox" class="krig" hidden></div>
     <div class="scen" id="scen">
       <button class="btn jump" data-min="370"><b>Hidden inversion</b><span>6:10 AM. Ground wind looks acceptable.</span></button>
       <button class="btn jump" data-min="660"><b>Suitable at both heights</b><span>11:00 AM. All measured checks pass.</span></button>
@@ -106,6 +94,23 @@
       <ul id="recent" class="recent"></ul>
     </div>
   </section>
+
+  <details class="sec" id="jobSec">
+    <summary><b>Job setup</b><span>Crop, pest, spray type and how to apply</span></summary>
+    <div class="secBody">
+    <div class="www two">
+      <div class="wcol"><h3 class="wh">What</h3>
+        <div class="wpair"><div><label class="wlab" for="cropSel">Crop</label><select id="cropSel"></select></div>
+          <div><label class="wlab" for="pestPick">Pest found</label><select id="pestPick"></select></div></div>
+        <div id="chemBox" class="chems"></div>
+        <label class="wlab" for="whatSel">Spray type, from your PCA recommendation</label>
+        <select id="whatSel"></select>
+        <div id="whatNote" class="wtxt"></div>
+      </div>
+      <div class="wcol"><h3 class="wh">How</h3><div id="howBox" class="wtxt"></div></div>
+    </div>
+    </div>
+  </details>
 
   <details class="sec" id="rulesSec">
     <summary><b>Decision rules and job settings</b><span>Active thresholds, product, sensitive site, data import</span></summary>
@@ -137,7 +142,7 @@
       <div class="row wrap">
         <label class="chk"><input type="checkbox" id="optSound" checked> Sound on alerts</label>
         <label class="chk"><input type="checkbox" id="optPush"> Browser notifications (only while this page is open)</label>
-        <label class="chk"><input type="checkbox" id="optNotify" checked> Tell nearby growers when I start spraying (no name, no product)</label>
+        <label class="chk"><input type="checkbox" id="optNotify"> Share with nearby growers when I start and when I sign a record (no name, no product). Off unless you tick it. Never sent in demo mode.</label>
         <label class="chk"><input type="checkbox" id="optDropHi"> Test: disconnect the 30 ft sensor</label>
       </div>
       <div class="row wrap">
@@ -159,6 +164,11 @@
       <div id="fcBox" class="fcBox"><div class="muted">Not loaded yet.</div></div>
       <div class="muted small"><span class="srcTag light">Regional model forecast</span> Open-Meteo weather model: temperature at 2 m (about 6 ft) and 80 m (about 260 ft), wind at 10 m (about 33 ft). These are not the tower heights and a regional model does not resolve one orchard block. It cannot replace measurements in the orchard. Only the inversion check, the ground wind limits and the sensitive site check are applied to it.</div>
     </div>
+  </details>
+
+  <details class="sec" id="modelSec" hidden>
+    <summary><b>Spatial estimates</b><span>Farm IDW estimate and network kriging estimate, live model mode only</span></summary>
+    <div class="secBody"><div id="krigBox" class="krig"></div></div>
   </details>
 
   <details class="sec" id="fileSec">

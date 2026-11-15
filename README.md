@@ -110,10 +110,24 @@ The What box now starts with two pickers: **Crop** (ten major Arizona crops) and
 
 This is a reference for the conversation with a PCA, not a prescription. All data is in `pests.js`.
 
+## Weather, site concerns and the overall decision
+
+The big status is the **application decision**. Under it the page shows two inputs separately:
+
+- **Weather**: temperature, wind, inversion and (with a tower) shear checks. The ground station comparison, the missed hours statistic and the planned job window use the weather result only, so the comparison is like for like.
+- **Site and community concerns**: a sensitive site in the measured downwind direction, and unverified community reports. These can add caution to the decision. They never change the weather result, and a projected weather window never implies a concern has cleared.
+
+Demo mode is isolated. Actual community reports are never used in demo decisions, and demo mode never sends a report, whatever the sharing box says. Sharing is off until the user ticks it.
+
+Switching location is guarded. Each load carries a request number, a reply that arrives after another switch is ignored, and nothing is evaluated or logged until the weather and the community feed for the new location are both in. A feed that cannot be reached is shown as unavailable, not as zero reports. Every record row carries mode, location, data source and feed state.
+
+Model limits. Farm IDW and network kriging are two estimation methods on the same regional weather model. When they agree that is a consistency check, not independent field validation. The kriging spread shown is an interpolation figure from the fitted variogram, not a validated accuracy at the farm.
+
 ## Tests
 
 ```
 node tests/engine.test.js      # 64 decision logic checks, no dependencies
+python3 tests/acceptance.py [url]   # 35 acceptance checks: demo isolation, location switching, decision consistency (weather and database mocked)
 python3 tests/flows.py [url]   # 68 user flow checks in a headless browser (needs Playwright and Chrome)
 ```
 

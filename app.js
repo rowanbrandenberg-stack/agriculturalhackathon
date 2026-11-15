@@ -3,7 +3,7 @@
   const E = window.SprayEngine, S = window.SpraySim;
   const $ = id => document.getElementById(id);
   const f1 = E.f1;
-  const BUILD = '2026-11-15.14';
+  const BUILD = '2026-11-15.15';
   /* Live mode: a real location, real model weather. Rounded coordinates for the area, not the farm's address. No tower is installed there. */
   const FARM = { name: 'SouthWinds Farm area', place: 'near Benson, Arizona', lat: 31.97, lon: -110.29 };
   const BLOCK_SIM = 'Block 7, lemons, Yuma County, Arizona';
@@ -31,7 +31,7 @@
   let series = simSeries();
   let source = { kind: 'sim' };
   let dropHi = false;
-  let evals = [], overIdx = null, community = [];
+  let evals = [], overIdx = null, community = [], feedLoc = null, reqId = 0;
   let idx = Math.round(370 / stepMin);
   let playing = false, timer = null, stopAt = null;
   let log = [];
@@ -76,11 +76,14 @@
   const cfgAt = i => (isLive() && series[i].near) ? Object.assign({}, cfg, { nearby: series[i].near }) : cfg;
   const evalReading = i => { const r = reading(i); if (isLive()) { r.wHi = r.wLo; r.dHi = r.dLo; } return r; };
   const metaOf = i => ({ ageMin: series[i].ageMin, staleMin: cfg.staleIntervals * stepMin });
+  /* Actual community reports are used only in live mode, and only once the feed for that location has loaded. Demo and imported data never see them. */
+  const usedCommunity = () => (isLive() && feedLoc === 'live') ? community : [];
+  const locName = () => isLive() ? FARM.name + ', ' + FARM.place : source.kind === 'sim' ? 'Demo block (simulated)' : 'Imported file';
   function recompute() { evals = series.map((s, i) => E.evaluate(evalReading(i), cfgAt(i), metaOf(i))); overIdx = null; }
   /* Community reports are about right now, so they adjust only the current reading, never the day totals. */
   function setNow() {
     if (overIdx != null && overIdx !== idx && overIdx < series.length) evals[overIdx] = E.evaluate(evalReading(overIdx), cfgAt(overIdx), metaOf(overIdx));
-    evals[idx] = E.evaluate(evalReading(idx), Object.assign({}, cfgAt(idx), { community: community }), metaOf(idx)); overIdx = idx;
+    evals[idx] = E.evaluate(evalReading(idx), Object.assign({}, cfgAt(idx), { community: usedCommunity() }), metaOf(idx)); overIdx = idx;
   }
   const baseEvals = () => evals.map((e, i) => i === overIdx ? E.evaluate(evalReading(i), cfgAt(i), metaOf(i)) : e);
   function download(name, text, type) { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], { type: type || 'text/csv' })); a.download = name; document.body.appendChild(a); a.click(); a.remove(); }
@@ -89,7 +92,7 @@
   function goodReasons(r, ev) {
     const lo = cfg.loLabel, hi = cfg.hiLabel, out = [];
     out.push(['No inversion detected between ' + lo + ' and ' + hi, 'The ' + hi + ' reading is ' + f1(-ev.dT) + '°F cooler than the ' + lo + ' reading.']);
-    if (isLive()) out.push(['Ground wind inside your limits', f1(r.wLo) + ' mph from the ' + E.compass(r.dLo) + ' in the model at 10 m. Limits are ' + cfg.windMin + ' to ' + cfg.windMax + ' mph. Wind shear is not judged without a tower.']);
+    if (isLive()) out.push(['Ground wind inside your limits', f1(r.wLo) + ' mph from the ' + E.compass(r.dLo) + ' in the model at 10 m. Limits are ' + cfg.windMin + ' to ' + cfg.windMax + ' mph. Not checked in this mode: upper wind and wind shear. They need a tower.']);
     else {
       out.push(['Wind inside your limits at both heights', f1(r.wLo) + ' mph at ' + lo + ' and ' + f1(r.wHi) + ' mph at ' + hi + '. Limits are ' + cfg.windMin + ' to ' + cfg.windMax + ' mph.']);
       out.push(['Wind similar at both heights', 'From the ' + E.compass(r.dLo) + ' at ' + lo + ' and the ' + E.compass(r.dHi) + ' at ' + hi + ', ' + Math.round(ev.shearDir) + '° apart. Speeds differ by ' + f1(Math.abs(ev.shearSpd)) + ' mph.']);
@@ -97,48 +100,61 @@
     if (cfg.siteOn) out.push(['Measured winds point away from the ' + cfg.siteName, 'This does not establish where all droplets or vapor will travel.']);
     return out;
   }
+  let moreOpen = false;
   function renderStatus() {
     const r = reading(idx), ev = evals[idx];
     $('statusCard').className = 'status ' + ev.status;
     $('statusWord').textContent = ev.status;
-    let action = { GO: (isLive() ? 'Model weather checks passed. No tower on site.' : 'Measured weather checks passed.') + ' Confirm label requirements and on site conditions before applying.', CAUTION: 'Marginal. Read the reasons and recheck before each tank.', STOP: 'Do not spray right now.', UNABLE: 'Unable to assess. This is not a GO.' }[ev.status];
+    let action = { GO: (isLive() ? 'The model checks that can run passed. Upper wind and shear are not checked without a tower.' : 'Measured weather checks passed.') + ' Confirm label requirements and on site conditions before applying.', CAUTION: 'Marginal. Read the reasons and recheck before each tank.', STOP: 'Do not spray right now.', UNABLE: 'Unable to assess. This is not a GO. Check or restore the sensor that is not reporting.' }[ev.status];
     if (session.state === 'spraying' && ev.status === 'STOP') action = 'Stop spraying now.';
     $('statusAction').textContent = action;
+    const nC = ev.concerns.length, feedBad = isLive() && netOnline === false;
+    $('splitLine').innerHTML = '<span>Weather <b class="pill ' + ev.weather + '">' + ev.weather + '</b></span><span>Site and community concerns <b class="pill ' + (nC ? (ev.concerns.some(c => c.level === 2) ? 'STOP' : 'CAUTION') : 'NONE') + '">' + (nC ? nC + ' open' : 'none') + '</b></span>' +
+      (isLive() ? '<span class="muted">' + (feedBad ? 'Community feed unavailable. Reports are not being checked.' : feedLoc === 'live' ? 'Community feed checked for this location.' : 'Community feed loading.') + '</span>' : '<span class="muted">Demo: actual community reports are not used.</span>');
     const ul = $('reasons'); ul.innerHTML = '';
-    const add = (cls, title, text) => { const li = document.createElement('li'); li.className = cls; li.innerHTML = '<b>' + esc(title) + '</b>' + esc(text); ul.appendChild(li); };
-    ev.problems.forEach(p => add('pb', 'Cannot assess', p.text));
-    ev.triggers.forEach(t => add('l' + t.level, t.title, t.text));
-    if (ev.status === 'GO') goodReasons(r, ev).forEach(g => add('ok', g[0], g[1]));
+    const items = [];
+    ev.problems.forEach(p => items.push(['pb', 'Cannot assess', p.text, 1.5]));
+    ev.triggers.forEach(t => items.push(['l' + t.level, t.title, t.text, t.level]));
+    if (ev.status === 'GO') { goodReasons(r, ev).forEach(g => items.push(['ok', g[0], g[1], 0])); }
+    const li = it => '<li class="' + it[0] + '"><b>' + esc(it[1]) + '</b>' + esc(it[2]) + '</li>';
+    const rest = items.slice(1), stops = rest.filter(it => it[3] === 2).length;
+    ul.innerHTML = (items[0] ? li(items[0]) : '') + (rest.length ? '<li class="more"><details id="moreWhy"' + (moreOpen ? ' open' : '') + '><summary>' + (ev.status === 'GO' ? 'View the other checks (' + rest.length + ')' : 'View additional concerns (' + rest.length + (stops ? ', ' + stops + ' of them STOP' : '') + ')') + '</summary><ul class="reasons">' + rest.map(li).join('') + '</ul></details></li>' : '');
+    const mw = $('moreWhy'); if (mw) mw.addEventListener('toggle', () => { moreOpen = mw.open; });
     const gp = $('groundPill'); gp.textContent = ev.ground.status; gp.className = 'pill ' + ev.ground.status;
     $('groundText').textContent = ev.ground.text;
     const gm = $('groundMiss');
     if (ev.missed) {
-      const miss = ev.triggers.filter(t => !/^WIND_(LOW|HIGH)_LO$/.test(t.code)).map(t => t.title.toLowerCase());
-      gm.className = 'gmiss'; gm.textContent = 'A wind check at 5 ft alone does not show: ' + miss.join('; ') + '.';
-    } else if (ev.ground.status === ev.status) { gm.className = 'gmiss same'; gm.textContent = 'Same result as the two height rules for this reading.'; }
-    else { gm.className = 'gmiss same'; gm.textContent = 'The two height rules give ' + ev.status + ' for this reading.'; }
+      const miss = ev.triggers.filter(t => !/^WIND_(LOW|HIGH)_LO$/.test(t.code) && !/^NET_|^SITE_/.test(t.code)).map(t => t.title.toLowerCase());
+      gm.className = 'gmiss'; gm.textContent = 'A wind check near the ground alone does not show: ' + miss.join('; ') + '.';
+    } else if (ev.ground.status === ev.weather) { gm.className = 'gmiss same'; gm.textContent = 'Same weather result as ' + (isLive() ? 'the model checks' : 'the two height rules') + ' for this reading.'; }
+    else { gm.className = 'gmiss same'; gm.textContent = (isLive() ? 'The model checks' : 'The two height rules') + ' give ' + ev.weather + ' for the weather on this reading.'; }
     $('clock').textContent = fmtTime(series[idx].min);
     $('clockSub').textContent = isLive() ? (series[idx].min >= 1440 ? 'tomorrow, ' : '') + (idx > nowIdx() ? 'model forecast hour' : idx === nowIdx() ? 'this hour, model' : 'earlier model hour') + ', ' + TZ.abbr : 'measurement time, ' + TZ.abbr;
   }
 
   /* ---------- planned job ---------- */
+  const wxEvals = () => evals.map(e => ({ status: e.weather }));
+  const jobNow = () => E.jobAssessment(wxEvals(), idx, stepMin, cfg.jobHours);
+  const CONCERN_NOTE = 'Weather may be suitable during this window. Site concerns still require resolution.';
   function renderJob() {
-    const b = baseEvals(); b[idx] = evals[idx];
-    const j = E.jobAssessment(b, idx, stepMin, cfg.jobHours), endT = tm(series[Math.min(series.length - 1, idx + j.runMin / stepMin)].min);
+    const ev = evals[idx], j = jobNow(), endT = tm(series[Math.min(series.length - 1, idx + j.runMin / stepMin)].min), nC = ev.concerns.length;
     let tag, cls, txt;
     if (j.state === 'STOP') { tag = 'STOP'; cls = 'STOP'; txt = 'Current weather is STOP, so this job should not start now.'; }
-    else if (j.state === 'UNKNOWN' && j.current === 'UNABLE') { tag = 'UNKNOWN'; cls = 'UNABLE'; txt = 'Current weather cannot be assessed, so the window for this job is unknown.'; }
-    else if (j.state === 'UNKNOWN') { tag = 'UNKNOWN'; cls = 'UNABLE'; txt = 'The data ends at ' + tm(series[series.length - 1].min) + '. Only ' + durWords(j.runMin) + ' of suitable conditions are projected and this job needs ' + durWords(j.needMin) + '. The rest is not known.'; }
+    else if (j.state === 'UNKNOWN' && j.current === 'UNABLE') { tag = 'UNKNOWN'; cls = 'UNABLE'; txt = 'Current weather cannot be assessed, so the window for this job is unknown. Check or restore the sensor that is not reporting.'; }
+    else if (j.state === 'UNKNOWN') { tag = 'UNKNOWN'; cls = 'UNABLE'; txt = 'The data ends at ' + tm(series[series.length - 1].min) + '. Only ' + durWords(j.runMin) + ' of suitable weather is projected and this job needs ' + durWords(j.needMin) + '. The rest is not known.'; }
     else if (j.state === 'WAIT' && j.current === 'CAUTION') { tag = 'WAIT'; cls = 'CAUTION'; txt = 'Current weather is CAUTION.'; }
-    else if (j.state === 'WAIT') { tag = 'WAIT'; cls = 'CAUTION'; txt = 'Only ' + durWords(j.runMin) + ' of projected suitable conditions remain for this ' + jobWords() + ' job.'; }
-    else { tag = 'SUFFICIENT WINDOW'; cls = 'GO'; txt = durWords(j.runMin) + ' of projected suitable conditions, until ' + endT + '. This ' + jobWords() + ' job fits.'; }
+    else if (j.state === 'WAIT') { tag = 'WAIT'; cls = 'CAUTION'; txt = 'Only ' + durWords(j.runMin) + ' of projected suitable weather remain for this ' + jobWords() + ' job.'; }
+    else if (nC) { tag = 'WEATHER WINDOW ONLY'; cls = 'CAUTION'; txt = durWords(j.runMin) + ' of projected suitable weather, until ' + endT + ', long enough for this ' + jobWords() + ' job. ' + CONCERN_NOTE; }
+    else { tag = 'SUFFICIENT WINDOW'; cls = 'GO'; txt = durWords(j.runMin) + ' of projected suitable weather, until ' + endT + '. This ' + jobWords() + ' job fits.'; }
     let nxt = '';
-    if (j.state !== 'SUFFICIENT') nxt = j.next ? 'Next projected suitable weather window: ' + tm(series[j.next.start].min) + ' to ' + tm(series[j.next.start].min + j.next.hours * 60) + ' (' + durWords(j.next.hours * 60) + ').'
+    if (j.state !== 'SUFFICIENT') nxt = j.next ? 'Projected suitable weather window: ' + tm(series[j.next.start].min) + ' to ' + tm(series[j.next.start].min + j.next.hours * 60) + ' (' + durWords(j.next.hours * 60) + ').' + (nC ? ' ' + CONCERN_NOTE : '')
       : 'No later window of ' + durWords(j.needMin) + ' is projected in this data.';
     if (cfg.jobCost > 0 && j.state !== 'SUFFICIENT') nxt += ' Product cost you entered for this job: $' + Math.round(cfg.jobCost).toLocaleString('en-US') + '. That is what a wasted application puts at stake.';
-    const src = source.kind === 'sim' ? 'Projection source: the remaining samples of a known simulated day. This is a demonstration, not a forecast.' : isLive() ? 'Projection source: the regional model forecast for the hours ahead (Open-Meteo). A forecast for the area, not a measurement at the farm.' : 'Projection source: later rows of the imported file. This is not a forecast.';
+    const src = source.kind === 'sim' ? 'Projection source: the remaining samples of a known simulated day. This is a demonstration, not a forecast.' : isLive() ? 'Projection source: the regional model forecast for the hours ahead (Open-Meteo). A forecast for the area, not a measurement at the farm, and no replacement for readings in the field.' : 'Projection source: later rows of the imported file. This is not a forecast.';
+    const cPill = nC ? (ev.concerns.some(c => c.level === 2) ? 'STOP' : 'CAUTION') : 'NONE';
     $('jobStrip').className = 'jobstrip ' + cls;
-    $('jobStrip').innerHTML = '<div class="jl"><span class="jk">Current weather</span><span class="pill ' + evals[idx].status + '">' + evals[idx].status + '</span></div>' +
+    $('jobStrip').innerHTML = '<div class="jl"><span class="jk">Current weather</span><span class="pill ' + ev.weather + '">' + ev.weather + '</span><span class="jt">Temperature, wind, inversion' + (isLive() ? '' : ' and shear') + ' checks only.</span></div>' +
+      '<div class="jl"><span class="jk">Site concerns</span><span class="pill ' + cPill + '">' + (nC ? nC + ' OPEN' : 'NONE') + '</span><span class="jt">' + (nC ? esc(ev.concerns.map(c => c.title).join('; ')) + '.' : 'No sensitive site or community concern flagged for this reading.') + '</span></div>' +
       '<div class="jl"><span class="jk">Planned job</span><span class="pill ' + cls + '">' + tag + '</span><span class="jt">' + esc(txt) + ' ' + esc(nxt) + '</span></div>' +
       '<div class="jsrc">' + src + '</div>';
     return j;
@@ -245,7 +261,7 @@
   function renderTimeline() {
     const svg = $('tl'); const W = Math.max(300, svg.clientWidth || 1000), H = 300; const narrow = W < 700;
     svg.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
-    const L = narrow ? 76 : 150, Rm = narrow ? 6 : 12, n = series.length, base = baseEvals();
+    const L = narrow ? 76 : 150, Rm = narrow ? 6 : 12, n = series.length, base = evals.map(e => ({ status: e.weather, missed: e.missed, dT: e.dT, ground: e.ground }));
     const x = i => L + (i / n) * (W - L - Rm);
     const SHORT = { 'Two height rules': 'Two height', 'Ground wind check': 'Ground only', 'Missed by ground': 'Missed', 'Temp difference': 'Temp diff', 'Wind speed': 'Wind mph' };
     const lab = (y, t, sub) => narrow ? '<text x="2" y="' + y + '" font-size="11" font-weight="600" fill="#17201b">' + SHORT[t] + '</text>' :
@@ -283,6 +299,7 @@
     svg.innerHTML = h;
     const missedH = base.filter(e => e.missed).length * stepMin / 60;
     if (isLive()) { const nx = x(nowIdx() + 0.5); svg.innerHTML += '<text x="' + (nx + 4) + '" y="' + (H - 2) + '" font-size="10" font-weight="600" fill="#15212a">now</text><line x1="' + nx + '" y1="276" x2="' + nx + '" y2="292" stroke="#15212a"/>'; }
+    if (evals.some(e => e.weather === 'UNABLE')) { $('tlfoot').innerHTML = '<b>Comparison unavailable: insufficient sensor data.</b> Missing readings are not counted as detected or as missed. Restore the sensor to compare.'; return; }
     $('tlfoot').innerHTML = (source.kind === 'sim' ? 'In this simulated day' : isLive() ? 'In the regional model for today and tomorrow at this location' : 'In this imported data') + ', ground wind checks missed <b>' + f1(missedH) + ' hours</b> flagged by ' + (isLive() ? 'the inversion check' : 'our two height rules') + '. ' +
       '<span class="muted">Counted from the readings and the active thresholds. It is not a measure of drift prevented or of detection accuracy.</span>';
   }
@@ -294,19 +311,29 @@
 
   /* ---------- rules, monitoring, recent alerts ---------- */
   function renderRules() {
-    $('rulesLine').innerHTML = 'Active rules: inversion alert whenever ' + cfg.hiLabel + ' is warmer than ' + cfg.loLabel + '; wind ' + cfg.windMin + ' to ' + cfg.windMax + ' mph at both heights; speed difference ' + cfg.shearSpeed + ' mph; direction difference ' + cfg.shearDir + '°. ' + (isLive() ? '<b>Live model mode:</b> only the inversion check, ground wind limits and the sensitive site check apply. Shear and upper wind checks need a tower. ' : '') + '<a href="#rulesSec" class="lnk" data-open="rulesSec">See all rules</a>';
+    const live = isLive(), lo = cfg.loLabel, hi = cfg.hiLabel, loW = cfg.loWindLabel || lo, dflt = cfg.windMin === 3 && cfg.windMax === 10;
+    const guide = dflt ? ' <b>3 to 10 mph is general guidance, not confirmed for your product.</b> Enter the limits from your label in the settings.' : ' Wind limits were set by you.';
+    $('rulesLine').innerHTML = (live
+      ? 'Checks running in live model mode: inversion (' + hi + ' air against ' + lo + ' air), wind ' + cfg.windMin + ' to ' + cfg.windMax + ' mph at ' + loW + ', nearby and network model points. <b>Not available without a tower:</b> upper wind limit, speed difference, direction difference.'
+      : 'Checks running: inversion alert whenever ' + hi + ' is warmer than ' + lo + '; wind ' + cfg.windMin + ' to ' + cfg.windMax + ' mph at both heights; speed difference ' + cfg.shearSpeed + ' mph; direction difference ' + cfg.shearDir + '°.') + guide + ' <a href="#rulesSec" class="lnk" data-open="rulesSec">See all rules</a>';
+    const ON = '<span class="pill GO">ON</span>', OFF = '<span class="pill UNABLE">NOT AVAILABLE</span>', NA = 'Not available in this mode. ', tol = live ? 'tolerance setting' : 'sensor uncertainty';
     const rows = [
-      ['Inversion', cfg.hiLabel + ' temperature greater than ' + cfg.loLabel + ' temperature', 'STOP. Any positive difference alerts. A difference inside ±' + cfg.sensorUnc + '°F sensor uncertainty is still shown, with a note.'],
-      ['Small temperature difference', cfg.hiLabel + ' less than ' + cfg.sensorUnc + '°F cooler than ' + cfg.loLabel, 'CAUTION. The readings cannot rule out an inversion.'],
-      ['Wind above limit', 'Over ' + cfg.windMax + ' mph at either height', 'STOP. 10 mph is common guidance. The product label controls the real limit.'],
-      ['Wind below minimum', 'Under ' + cfg.windMin + ' mph at either height', 'CAUTION. 3 mph is common guidance. The product label controls the real limit.'],
-      ['Speed difference between heights', cfg.shearSpeed + ' mph or more', 'CAUTION. Configurable prototype threshold, not a sourced limit.'],
-      ['Direction difference between heights', cfg.shearDir + '° or more, shortest way around the compass', 'CAUTION. Configurable prototype threshold. Skipped when wind is under ' + cfg.calmMph + ' mph because calm air has no reliable direction.'],
-      ['Sensitive site', 'Measured wind at either height within ' + cfg.siteCone + '° of the site', 'CAUTION alone. STOP together with any other flag.'],
-      ['Missing or invalid reading', 'Any required value absent or impossible', 'UNABLE to assess. Never GO.'],
-      ['Stale reading', 'Older than ' + cfg.staleIntervals + ' sampling intervals (' + cfg.staleIntervals * stepMin + ' minutes at a ' + stepMin + ' minute interval)', 'UNABLE to assess. Never GO.'],
-      ['Combining', 'Worst single flag decides', 'Nothing is averaged, so no good reading can cancel a STOP.']];
-    $('rulesBox').innerHTML = '<table class="rt"><thead><tr><th>Rule</th><th>Active threshold</th><th>Result and purpose</th></tr></thead><tbody>' + rows.map(r => '<tr><td>' + r[0] + '</td><td>' + r[1] + '</td><td>' + r[2] + '</td></tr>').join('') + '</tbody></table>';
+      ['Inversion', ON, hi + ' temperature greater than ' + lo + ' temperature', 'STOP. Any positive difference alerts. A difference inside the ±' + cfg.sensorUnc + '°F ' + tol + ' is still shown, with a note.'],
+      ['Small temperature difference', ON, hi + ' less than ' + cfg.sensorUnc + '°F cooler than ' + lo, 'CAUTION. The ' + (live ? 'model values' : 'readings') + ' cannot rule out an inversion.'],
+      ['Wind above limit', ON, 'Over ' + cfg.windMax + ' mph at ' + (live ? loW + ' (model wind)' : 'either height'), 'STOP. 10 mph is common guidance. The product label controls the real limit.'],
+      ['Wind below minimum', ON, 'Under ' + cfg.windMin + ' mph at ' + (live ? loW + ' (model wind)' : 'either height'), 'CAUTION. 3 mph is common guidance. The product label controls the real limit.'],
+      ['Upper wind limit', live ? OFF : ON, live ? 'Model wind at 80 m is far above any canopy' : 'Over ' + cfg.windMax + ' or under ' + cfg.windMin + ' mph at ' + hi, live ? NA + 'Needs a sensor just above the canopy.' : 'Same limits as the lower sensor.'],
+      ['Speed difference between heights', live ? OFF : ON, live ? 'Needs two sensors on a tower' : cfg.shearSpeed + ' mph or more', (live ? NA : 'CAUTION. ') + 'Configurable prototype threshold, not a sourced limit.'],
+      ['Direction difference between heights', live ? OFF : ON, live ? 'Needs two sensors on a tower' : cfg.shearDir + '° or more, shortest way around the compass', (live ? NA : 'CAUTION. ') + 'Configurable prototype threshold. Skipped when wind is under ' + cfg.calmMph + ' mph because calm air has no reliable direction.'],
+      ['Sensitive site', cfg.siteOn ? ON : '<span class="pill UNABLE">OFF</span>', cfg.siteOn ? 'Measured wind at either height within ' + cfg.siteCone + '° of the site' : (live ? 'No sensitive site is set for this location' : 'Switched off in settings'), 'A site concern, reported apart from the weather. CAUTION alone. STOP together with any other flag.'],
+      ['Community reports', live ? ON : OFF, live ? 'Unverified reports within 3 miles of this location' : 'Demo mode never uses actual community reports', 'A site concern, reported apart from the weather. Reports can only add caution.']];
+    if (live) rows.push(['Nearby and network model points', ON, 'An inversion at model points around the site, or in the network estimate, while the site estimate shows none', 'CAUTION. Two estimation methods on the same weather model. A consistency check, not independent field validation.']);
+    rows.push(['Missing or invalid ' + (live ? 'value' : 'reading'), ON, 'Any required value absent or impossible', 'UNABLE to assess. Never GO. Missing data is not the same as a confirmed hazard.'],
+      ['Stale ' + (live ? 'model data' : 'reading'), ON, 'Older than ' + cfg.staleIntervals + ' sampling intervals (' + cfg.staleIntervals * stepMin + ' minutes at a ' + stepMin + ' minute interval)', 'UNABLE to assess. Never GO.'],
+      ['Combining', ON, 'Worst single flag decides', 'Nothing is averaged, so no good reading can cancel a STOP.']);
+    $('rulesBox').innerHTML = (live ? '<p class="muted small"><b>Model uncertainty.</b> These are regional model values at 2 m and 80 m for temperature and 10 m for wind, on a grid of several kilometres. They have no sensor accuracy, can miss a shallow inversion in one field, and do not replace measurements in the orchard. The ±' + cfg.sensorUnc + '°F figure is a tolerance setting, not a measured accuracy.</p>'
+      : '<p class="muted small"><b>Sensor accuracy.</b> The ±' + cfg.sensorUnc + '°F figure is an assumed accuracy for the simulated sensors.</p>') +
+      '<table class="rt"><thead><tr><th>Check</th><th>In this mode</th><th>Active threshold</th><th>Result and purpose</th></tr></thead><tbody>' + rows.map(r => '<tr><td>' + r[0] + '</td><td>' + r[1] + '</td><td>' + r[2] + '</td><td>' + r[3] + '</td></tr>').join('') + '</tbody></table>';
   }
   function renderSession() {
     const box = $('sessionBox'), btn = $('sprayBtn'), nowMin = series[idx].min;
@@ -317,7 +344,7 @@
   function toggleSession() {
     const nowMin = series[idx].min, ev = evals[idx];
     if (session.state === 'idle') { session = { state: 'spraying', startMin: nowMin, endMin: null, watchUntil: null }; fileRep = null; renderFile(); addLog('SPRAY START' + (ev.status !== 'GO' ? ' (started on ' + ev.status + ')' : ''));
-      if ($('optNotify').checked) postReport('spraying', 'Application started'); }
+      if (isLive() && $('optNotify').checked) postReport('spraying', 'Application started'); }
     else if (session.state === 'spraying') { session.state = 'watch'; session.endMin = nowMin; session.watchUntil = nowMin + WATCH_HOURS[cfg.volatility] * 60; addLog('SPRAY END, watch for ' + WATCH_HOURS[cfg.volatility] + ' h'); buildFile(); }
     else { addLog('WATCH ENDED'); session = idle(); }
     renderAll();
@@ -331,22 +358,16 @@
   /* ---------- what, when, how ---------- */
   const HOW_SOURCES = [['University of Arizona Extension, AZ1050', 'https://extension.arizona.edu/sites/extension.arizona.edu/files/pubs/az1050.pdf'], ['Ohio State Extension, FABE 535', 'https://ohioline.osu.edu/factsheet/fabe-535'], ['Montana State Extension', 'https://www.montana.edu/extension/pesticides/reference/drift.html'], ['NDSU Extension, AE1246', 'https://ndsu.edu/agriculture/sites/default/files/2024-10/ae1246.pdf'], ['Health Canada', 'https://www.canada.ca/en/health-canada/services/consumer-product-safety/pesticides-pest-management/growers-commercial-users/drift-mitigation/management-pesticide-spray-drift.html']];
   function renderWWW() {
-    const ev = evals[idx], p = PROFILES[cfg.profile || 'custom'], b = baseEvals(); b[idx] = ev;
-    const j = E.jobAssessment(b, idx, stepMin, cfg.jobHours);
+    const ev = evals[idx], p = PROFILES[cfg.profile || 'custom'];
     $('whatNote').innerHTML = esc(p.note) + ' <b>Rate and amount come from the label and your PCA.</b> This tool does not set them. <a href="#pestSec" class="lnk" data-open="pestSec">Not sure what the pest is? Open the pest guide</a>';
-    let when;
-    if (j.state === 'SUFFICIENT') when = '<b>Now.</b> ' + durWords(j.runMin) + ' of projected suitable weather, enough for this ' + jobWords() + ' job.';
-    else if (j.state === 'UNKNOWN') when = '<b>Unknown.</b> ' + (j.current === 'UNABLE' ? 'The weather cannot be assessed right now.' : 'The data ends before this job would finish.');
-    else when = '<b>Not now.</b> ' + (j.current === 'STOP' ? 'Current weather is STOP.' : j.current === 'CAUTION' ? 'Current weather is CAUTION.' : 'Only ' + durWords(j.runMin) + ' of suitable weather is projected and this job needs ' + durWords(j.needMin) + '.');
-    if (j.state !== 'SUFFICIENT') when += j.next ? ' Next projected suitable window: <b>' + fmtTime(series[j.next.start].min) + ' to ' + fmtTime(series[j.next.start].min + j.next.hours * 60) + '</b>.' : ' No later window of ' + durWords(j.needMin) + ' is projected in this data.';
-    $('whenBox').innerHTML = when;
     const tips = ['Read the spray drift section of the label first. It sets wind limits, droplet size, release height and buffers.',
       'Use the coarsest droplets the label allows. Higher pressure makes finer droplets, and finer droplets drift more.',
       'Match the sprayer air to the canopy. Too much air for the foliage sends spray through and above the trees.'];
     if (cfg.volatility === 'high') tips.push('Low drift nozzles reduce droplet drift. They do not reduce vapor drift from a volatile product.');
     let lead = '';
-    if (ev.status === 'STOP') lead = '<b>Changing the setup does not fix a STOP.</b> Wait for the weather.';
-    else if (ev.status === 'UNABLE') lead = '<b>Check the sensors first.</b>';
+    if (ev.status === 'UNABLE' || ev.weather === 'UNABLE') lead = '<b>A sensor is not reporting.</b> Check or restore it. This is missing data, not a confirmed weather hazard, and it still cannot be a GO.';
+    else if (ev.weather === 'STOP') lead = '<b>Changing the setup does not fix a STOP.</b> Wait for the weather.';
+    else if (ev.status === 'STOP') lead = '<b>The weather is not the blocker.</b> Resolve the site concern first.';
     else if (ev.triggers.some(t => t.code === 'SITE_DOWNWIND')) lead = '<b>Measured wind points toward the ' + esc(cfg.siteName) + '.</b> Buffers there are set by the label.';
     $('howBox').innerHTML = (lead ? '<div>' + lead + '</div>' : '') + '<ul>' + tips.map(t => '<li>' + t + '</li>').join('') + '</ul><div class="wsrc">General practice from ' + HOW_SOURCES.map(s => '<a href="' + s[1] + '" target="_blank" rel="noopener">' + s[0] + '</a>').join(', ') + '. The label and your PCA decide for your product.</div>';
   }
@@ -375,9 +396,9 @@
 
   /* ---------- record ---------- */
   function addLog(event) {
-    const r = reading(idx), ev = evals[idx], b = baseEvals(); b[idx] = ev;
+    const r = reading(idx), ev = evals[idx];
     log.unshift({ min: series[idx].min, measTs: measIso(series[idx].min), eventTs: new Date().toISOString(), event: event || 'Reading', status: ev.status, ground: ev.ground.status,
-      job: E.jobAssessment(b, idx, stepMin, cfg.jobHours).state, r: r, dT: ev.dT, shearSpd: ev.shearSpd, shearDir: ev.shearDir,
+      job: jobNow().state, weather: ev.weather, concerns: ev.concerns.map(c => c.title).join('; '), mode: source.kind === 'sim' ? 'demo' : source.kind, location: locName(), feed: isLive() ? (netOnline === false ? 'unavailable' : feedLoc === 'live' ? 'checked' : 'loading') : 'not used', r: r, dT: ev.dT, shearSpd: ev.shearSpd, shearDir: ev.shearDir,
       reasons: ev.triggers.map(t => t.title).concat(ev.problems.map(p => p.text)).join('; '), source: sourceName(), ageMin: series[idx].ageMin,
       th: { windMin: cfg.windMin, windMax: cfg.windMax, shearSpeed: cfg.shearSpeed, shearDir: cfg.shearDir, sensorUnc: cfg.sensorUnc }, jobHours: cfg.jobHours, product: PROFILES[cfg.profile || 'custom'].name, vol: cfg.volatility, site: cfg.siteOn ? cfg.siteName + ' ' + SITE_SIDE[cfg.siteBearing] : 'none' });
     if (log.length > 1500) log.length = 1500;
@@ -396,11 +417,11 @@
     const n = x => num(x) ? f1(x) : '';
     const head = ['measurement_timestamp', 'timezone', 'event_timestamp_utc', 'event', 'data_source', 'demo_data', 'reading_age_min', 'lower_height_ft', 'upper_height_ft', 'temp_lower_f', 'temp_upper_f', 'temp_diff_f',
       'wind_lower_mph', 'wind_upper_mph', 'wind_lower_from_deg', 'wind_upper_from_deg', 'wind_speed_diff_mph', 'wind_dir_diff_deg', 'weather_status', 'ground_only_status', 'planned_job_status', 'alert_reasons',
-      'wind_min_mph', 'wind_max_mph', 'speed_shear_threshold_mph', 'dir_shear_threshold_deg', 'sensor_uncertainty_f', 'job_hours', 'product_type', 'volatility', 'sensitive_site'];
+      'wind_min_mph', 'wind_max_mph', 'speed_shear_threshold_mph', 'dir_shear_threshold_deg', 'sensor_uncertainty_f', 'job_hours', 'product_type', 'volatility', 'sensitive_site', 'overall_decision', 'site_concerns', 'mode', 'location', 'community_feed'];
     const rows = [head.join(',')];
-    log.slice().reverse().forEach(l => rows.push([csvq(l.measTs), csvq(TZ.name), csvq(l.eventTs), csvq(l.event), csvq(l.source), source.kind === 'sim' ? 'true' : 'false', n(l.ageMin), isLive() ? 6.6 : 5, isLive() ? 262 : 30, n(l.r.tLo), n(l.r.tHi), n(l.dT),
-      n(l.r.wLo), n(l.r.wHi), num(l.r.dLo) ? Math.round(l.r.dLo) : '', num(l.r.dHi) ? Math.round(l.r.dHi) : '', n(l.shearSpd), num(l.shearDir) ? Math.round(l.shearDir) : '', l.status, l.ground, l.job, csvq(l.reasons),
-      l.th.windMin, l.th.windMax, l.th.shearSpeed, l.th.shearDir, l.th.sensorUnc, l.jobHours, csvq(l.product), csvq(l.vol), csvq(l.site)].join(',')));
+    log.slice().reverse().forEach(l => rows.push([csvq(l.measTs), csvq(TZ.name), csvq(l.eventTs), csvq(l.event), csvq(l.source), l.mode === 'demo' ? 'true' : 'false', n(l.ageMin), l.mode === 'live' ? 6.6 : 5, l.mode === 'live' ? 262 : 30, n(l.r.tLo), n(l.r.tHi), n(l.dT),
+      n(l.r.wLo), n(l.r.wHi), num(l.r.dLo) ? Math.round(l.r.dLo) : '', num(l.r.dHi) ? Math.round(l.r.dHi) : '', n(l.shearSpd), num(l.shearDir) ? Math.round(l.shearDir) : '', l.weather, l.ground, l.job, csvq(l.reasons),
+      l.th.windMin, l.th.windMax, l.th.shearSpeed, l.th.shearDir, l.th.sensorUnc, l.jobHours, csvq(l.product), csvq(l.vol), csvq(l.site), l.status, csvq(l.concerns), l.mode, csvq(l.location), l.feed].join(',')));
     return rows.join('\r\n');
   }
   window.__sowCsv = logCsv;   // used by the automated checks
@@ -514,7 +535,7 @@
     // Lay the readings on a regular time grid. A slot with no new reading carries the last one forward with its age, so gaps become stale.
     const out = []; let k = 0;
     for (let t = rows[0].min; t <= rows[rows.length - 1].min; t += step) { while (k + 1 < rows.length && rows[k + 1].min <= t) k++; out.push({ min: t, ageMin: t - rows[k].min, r: rows[k].r }); }
-    if (playing) togglePlay(); clearInterval(liveTimer); cfg.loLabel = E.DEFAULT_CFG.loLabel; cfg.hiLabel = E.DEFAULT_CFG.hiLabel; cfg.skipHiWind = false; cfg.skipShearSpeed = false;
+    if (playing) togglePlay(); clearInterval(liveTimer); reqId++; community = []; netLocal = []; feedLoc = null; cfg.loLabel = E.DEFAULT_CFG.loLabel; cfg.hiLabel = E.DEFAULT_CFG.hiLabel; delete cfg.loWindLabel; delete cfg.uncLabel; cfg.skipHiWind = false; cfg.skipShearSpeed = false;
     series = out; stepMin = step; source = { kind: 'import', file: name || 'file', rows: rows.length, first: rows[0].min, last: rows[rows.length - 1].min };
     session = idle(); fileRep = null; log = []; idx = 0; renderSource(); applyChange('DATA IMPORTED ' + source.file); renderFile();
   }
@@ -582,13 +603,15 @@
     lastStatus = after.status; renderAll(); renderNetwork();
   }
   async function pullNetwork(announce) {
-    try { const res = await fetch(SB + 'reports?select=id,created_at,kind,lat,lon,note&order=created_at.desc&limit=200', { headers: SBH });
-      if (!res.ok) throw new Error('HTTP ' + res.status);
-      netRows = await res.json(); netOnline = true; const ids = new Set(netRows.map(r => r.id)); netLocal = netLocal.filter(r => !ids.has(r.id));
-    } catch (e) { netOnline = false; }
+    const my = reqId, mode = source.kind; let rows = null;
+    try { rows = await fetchReports(); } catch (e) {}
+    if (my !== reqId || mode !== source.kind) return;           // a switch happened while this was loading
+    if (rows) { netRows = rows; netOnline = true; feedLoc = isLive() ? 'live' : 'demo'; const ids = new Set(netRows.map(r => r.id)); netLocal = netLocal.filter(r => !ids.has(r.id)); }
+    else { netOnline = false; if (isLive()) feedLoc = null; }
     applyNetwork(announce);
   }
   async function postReport(kind, note) {
+    if (!isLive()) { addLog('COMMUNITY REPORT NOT SENT (demo mode never sends reports)'); return false; }
     const me = blockPos(), row = { kind: kind, lat: +me.lat.toFixed(3), lon: +me.lon.toFixed(3), note: (note || '').trim().slice(0, 140) || null };
     let saved = null;
     try { const res = await fetch(SB + 'reports', { method: 'POST', headers: Object.assign({ Prefer: 'return=representation' }, SBH), body: JSON.stringify(row) });
@@ -619,7 +642,7 @@
     h += '<rect x="' + (Sz / 2 - 9) + '" y="' + (Sz / 2 - 9) + '" width="18" height="18" rx="4" fill="#15212a" stroke="#fff" stroke-width="2"/><text x="' + Sz / 2 + '" y="' + (Sz / 2 + 24) + '" text-anchor="middle" font-size="10" font-weight="600" fill="#15212a">This block</text>';
     h += '<text x="' + Sz / 2 + '" y="14" text-anchor="middle" font-size="11" font-weight="600" fill="#17201b">N</text></g>';
     $('heatMap').innerHTML = h;
-    $('heatState').innerHTML = '<span class="srcTag light">Sample community reports</span> drawn as shading so the map is not empty. <span class="srcTag light">Actual community reports</span> ' + real.length + ' nearby, drawn as solid dots' + (netOnline === false ? '. The shared database could not be reached, so only reports made on this device are shown.' : '.') + ' Only actual reports affect the weather call.';
+    $('heatState').innerHTML = '<span class="srcTag light">Sample community reports</span> drawn as shading so the map is not empty. <span class="srcTag light">Actual community reports</span> ' + real.length + ' nearby, drawn as solid dots. ' + (netOnline === false ? '<b>Community feed unavailable.</b> This is not the same as zero reports. ' : '') + (isLive() ? 'Actual reports count as site concerns for this location. They never change the weather result.' : '<b>Demo mode: actual reports are shown here but never change the demo decision, and nothing you tap is sent.</b>');
     const using = new Set(evals[idx].triggers.filter(t => /^NET_/.test(t.code)).map(t => ({ NET_INVERSION: 'inversion', NET_DRIFT: 'drift', NET_CREW: 'crew' }[t.code])));
     $('netFeed').innerHTML = community.slice(0, 10).map(c => '<li><span class="dot" style="background:' + KIND[c.kind][1] + '"></span><div><b>' + KIND[c.kind][0] + '</b> ' + (c.distMi < 0.15 ? 'at this block' : f1(c.distMi) + ' mi ' + E.compass(c.bearing)) + ', ' + (c.ageMin < 1 ? 'just now' : c.ageMin < 60 ? Math.round(c.ageMin) + ' min ago' : f1(c.ageMin / 60) + ' h ago') + (c.local ? ' (this device only)' : '') + (using.has(c.kind) ? ' <span class="used">affecting the call</span>' : '') + '</div></li>').join('') || '<li class="muted">No actual reports within 5 miles in the last 8 hours.</li>';
   }
@@ -627,7 +650,7 @@
   /* ---------- application record and signature ---------- */
   function loadSaved() { try { return JSON.parse(localStorage.getItem('sow_records') || '[]'); } catch (e) { return []; } }
   function buildFile() {
-    const iS = idxAt(session.startMin), iE = idxAt(session.endMin), b = baseEvals();
+    const iS = idxAt(session.startMin), iE = idxAt(session.endMin), b = wxEvals();
     let worst = 'GO'; for (let i = iS; i <= iE; i++) if (E.RANK[b[i].status] > E.RANK[worst]) worst = b[i].status;
     fileRep = { start: session.startMin, end: session.endMin, rs: reading(iS), re: reading(iE), worst: worst, source: sourceName(),
       alerts: log.filter(l => l.min >= session.startMin && l.min <= session.endMin && /^ALERT/.test(l.event)).length, product: cfg.profile && cfg.profile !== 'custom' ? PROFILES[cfg.profile].name : 'Not set', saved: null };
@@ -652,7 +675,7 @@
       const s = fileRep.saved;
       h += '<div class="filed"><b>' + (s.stored ? 'Signed and saved in this browser.' : 'Signed, but this browser refused to store it. Print or download it now.') + '</b> Reference ' + s.ref + '.<br>Signed by ' + esc(s.signer) + ' at ' + s.signedAt + '.<img class="signimg" alt="Signature" src="' + s.sig + '"></div>';
       h += '<div class="row"><button id="filePrint" class="btn primary">Print or save as PDF</button><button id="fileDl" class="btn">Download text copy</button></div>';
-      h += '<div class="muted small">' + (s.shared ? 'The conditions, with no name and no signature, were sent to the shared community database.' : 'The shared community database could not be reached, so nothing was sent there.') + ' Nothing was sent to the Arizona Department of Agriculture. This covers the timing and weather part of Form 1080 and is not the official form.</div>';
+      h += '<div class="muted small">' + (s.shared ? 'The conditions, with no name and no signature, were sent to the shared community database.' : 'Nothing was sent to the shared community database.') + ' Nothing was sent to the Arizona Department of Agriculture. This covers the timing and weather part of Form 1080 and is not the official form.</div>';
     } else {
       h += '<div class="sign"><label for="signName">Applicator name</label><input id="signName" type="text" autocomplete="name" style="width:100%" value="' + esc(fileRep.signer || '') + '"></div>';
       h += '<div class="sign"><label>Sign here</label><div class="signpad"><canvas id="signPad"></canvas><div class="line"></div><div class="hint">Draw with a finger or the mouse</div></div></div>';
@@ -678,7 +701,7 @@
     $('fileBtn').onclick = async () => { const fb = $('fileBtn'); fb.disabled = true; fb.textContent = 'Saving…';
       const s = { sig: cv.toDataURL('image/png'), signer: $('signName').value.trim(), signedAt: new Date().toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' }),
         ref: 'SOW ' + dateStr().slice(5).replace('-', '') + ' ' + String(Math.floor(1000 + Math.random() * 9000)) };
-      s.shared = await postReport('spraying', 'Application recorded. Weather call during job: ' + fileRep.worst);
+      s.shared = (isLive() && $('optNotify').checked) ? await postReport('spraying', 'Application recorded. Weather call during job: ' + fileRep.worst) : false;
       const rec = { ref: s.ref, date: dateStr(), time: fmtTime(fileRep.start) + ' to ' + fmtTime(fileRep.end), signer: s.signer, signedAt: s.signedAt, call: 'Weather call during the job: ' + fileRep.worst, fields: fileRows(fileRep), sig: s.sig, demo: source.kind === 'sim', source: fileRep.source, shared: s.shared };
       // Save, then read it back. Only say it is saved if the read back matches.
       try { const all = loadSaved(); all.unshift(rec); localStorage.setItem('sow_records', JSON.stringify(all.slice(0, 50))); s.stored = loadSaved().some(r => r.ref === s.ref); } catch (e) { s.stored = false; }
@@ -746,13 +769,15 @@
   let liveTimer = null, followNow = true, simSite = true, livePts = 1, liveNet = 0;
   const SP = window.SpraySpatial;
   function renderKrig() {
-    const box = $('krigBox'), s = series[idx], kr = isLive() && s.near && s.near.net; box.hidden = !kr; if (!kr) return;
-    const r = s.r, idwDT = r.tHi - r.tLo, words = d => Math.abs(d) < 0.05 ? 'no difference between heights' : f1(Math.abs(d)) + '\u00B0F ' + (d > 0 ? 'warmer' : 'cooler') + ' aloft';
+    const box = $('krigBox'), s = series[idx], kr = isLive() && s.near && s.near.net; $('modelSec').hidden = !kr; if (!kr) { box.innerHTML = ''; return; }
+    const r = s.r, idwDT = r.tHi - r.tLo, words = d => Math.abs(d) < 0.05 ? 'no difference between heights' : f1(Math.abs(d)) + '°F ' + (d > 0 ? 'warmer' : 'cooler') + ' aloft';
     const agree = (kr.v > 0) === (idwDT > 0), gap = Math.abs(kr.v - idwDT);
-    box.innerHTML = '<div class="kg"><div><span>Farm model, IDW</span><b>' + words(idwDT) + '</b><i>' + livePts + ' points within ' + RING_KM + ' km</i></div>' +
-      '<div><span>Network model, kriging</span><b>' + words(kr.v) + '</b><i>' + kr.n + ' points across 40 km, give or take ' + f1(kr.sd) + '\u00B0F</i></div>' +
-      '<div><span>Compare</span><b class="' + (agree ? 'kok' : 'kbad') + '">' + (agree ? 'Models agree' : 'Models disagree') + '</b><i>' + f1(gap) + '\u00B0F apart' + (agree ? '' : '. The stricter one decides') + '</i></div></div>' +
-      '<div class="muted small">The network model does not use this farm\u2019s own points, so the two are independent checks. Demo network: model points stand in for member farm towers, which do not exist yet.</div>';
+    box.innerHTML = '<div class="kg"><div><span>Farm estimate, IDW</span><b>' + words(idwDT) + '</b><i>' + livePts + ' model points within ' + RING_KM + ' km</i></div>' +
+      '<div><span>Network estimate, kriging</span><b>' + words(kr.v) + '</b><i>' + kr.n + ' model points across 40 km</i></div>' +
+      '<div><span>Compare</span><b class="' + (agree ? 'kok' : 'kbad') + '">' + (agree ? 'Estimates agree' : 'Estimates disagree') + '</b><i>' + f1(gap) + '°F apart' + (agree ? '' : '. The stricter one decides') + '</i></div></div>' +
+      '<div class="muted small">' + (agree ? 'Two spatial estimation methods agree. ' : 'Two spatial estimation methods disagree. ') + 'This is a consistency check, not independent field validation: both use points from the same regional weather model. ' +
+      'Kriging interpolation spread at this spot: ' + f1(kr.sd) + '°F. That number comes from the fitted variogram and says how much the model points vary with distance. It is not a measured or validated accuracy at the farm. ' +
+      'Demo network: model points stand in for member farm towers, which do not exist yet.</div>';
   }
   function nowIdx() { if (!isLive()) return idx; const d = new Date(), m = d.getHours() * 60; let best = 0; series.forEach((s, i) => { if (s.min <= m) best = i; }); return best; }
   const RING_KM = 5;
@@ -781,34 +806,49 @@
       return { min: (t.slice(0, 10) === d0 ? 0 : 1440) + (+t.slice(11, 13)) * 60, ageMin: 0, r: SP.idwReading(pts, FARM), near: pts.length > 1 || kr ? { inv: pts.length > 1 ? c.inv : 0, of: c.of, km: RING_KM, net: kr } : null };
     }).slice(0, 48);
   }
+  async function fetchReports() {
+    const res = await fetch(SB + 'reports?select=id,created_at,kind,lat,lon,note&order=created_at.desc&limit=200', { headers: SBH });
+    if (!res.ok) throw new Error('HTTP ' + res.status); return res.json();
+  }
+  const liveBtn = on => { const b = $('modeLive'); b.disabled = on; b.textContent = on ? 'Loading live data…' : 'Live: ' + FARM.name; };
+  /* Every load carries a request number. A reply is used only if no switch has happened since it was asked for,
+     and nothing is evaluated or logged until the weather and the community feed for the new location are both in. */
   async function goLive() {
-    const btn = $('modeLive'); btn.disabled = true; btn.textContent = 'Loading live data…';
-    try {
-      const s = await fetchLive();
-      if (playing) togglePlay();
-      series = s; stepMin = 60; source = { kind: 'live', fetched: new Date() }; dropHi = false; $('optDropHi').checked = false;
-      cfg.loLabel = 'ground level'; cfg.hiLabel = '260 ft'; cfg.skipHiWind = true; cfg.skipShearSpeed = true;
-      simSite = cfg.siteOn; cfg.siteOn = false; fillForm();   // the demo school is invented, so it is not shown next to a real place
-      $('lat').value = FARM.lat; $('lon').value = FARM.lon;
-      session = idle(); fileRep = null; log = []; followNow = true; idx = nowIdx(); $('alertBar').hidden = true;
-      renderSource(); recompute(); setNow(); lastStatus = evals[idx].status; renderRules(); addLog('LIVE MODEL DATA LOADED'); renderAll(); renderFile(); applyNetwork(false);
-      clearInterval(liveTimer); liveTimer = setInterval(refreshLive, 600000);
-    } catch (e) { showAlert('CAUTION', 'Live data could not be loaded', 'The weather service did not answer, so nothing changed. You are still on the simulated demo day.'); }
-    btn.disabled = false; btn.textContent = 'Live: ' + FARM.name;
+    const my = ++reqId; liveBtn(true);
+    const got = await Promise.allSettled([fetchLive(), fetchReports()]);
+    if (my !== reqId) return;                                   // the user switched again: this reply is stale
+    liveBtn(false);
+    if (got[0].status !== 'fulfilled') { showAlert('CAUTION', 'Live data could not be loaded', 'The weather service did not answer, so nothing changed. You are still on the simulated demo day.'); return; }
+    if (playing) togglePlay();
+    community = []; netLocal = []; netRows = []; feedLoc = null;   // nothing from the previous location carries over
+    series = got[0].value; stepMin = 60; source = { kind: 'live', fetched: new Date(), req: my }; dropHi = false; $('optDropHi').checked = false;
+    cfg.loLabel = '2 m'; cfg.hiLabel = '80 m (about 260 ft)'; cfg.loWindLabel = '10 m'; cfg.uncLabel = 'tolerance setting'; cfg.skipHiWind = true; cfg.skipShearSpeed = true;
+    simSite = cfg.siteOn; cfg.siteOn = false; fillForm();   // the demo school is invented, so it is not shown next to a real place
+    $('lat').value = FARM.lat; $('lon').value = FARM.lon;
+    if (got[1].status === 'fulfilled') { netRows = got[1].value; netOnline = true; feedLoc = 'live'; } else { netOnline = false; }
+    buildCommunity();
+    session = idle(); fileRep = null; log = []; followNow = true; idx = nowIdx(); $('alertBar').hidden = true;
+    renderSource(); recompute(); setNow(); lastStatus = evals[idx].status; renderRules();
+    addLog('LIVE MODEL DATA LOADED' + (netOnline ? '' : ' (community feed unavailable)')); renderAll(); renderFile(); renderNetwork();
+    clearInterval(liveTimer); liveTimer = setInterval(refreshLive, 600000);
   }
   async function refreshLive() {
-    if (!isLive()) return;
-    try { const s = await fetchLive(); series = s; source.fetched = new Date(); }
-    catch (e) { const age = (Date.now() - source.fetched.getTime()) / 60000; series.forEach(x => { x.ageMin = age; }); }   // a failed refresh ages the data until it goes stale
+    if (!isLive()) return; const my = reqId; let s = null;
+    try { s = await fetchLive(); } catch (e) {}
+    if (my !== reqId || !isLive()) return;
+    if (s) { series = s; source.fetched = new Date(); }
+    else { const age = (Date.now() - source.fetched.getTime()) / 60000; series.forEach(x => { x.ageMin = age; }); }   // a failed refresh ages the data until it goes stale
     if (followNow) idx = nowIdx(); idx = Math.min(idx, series.length - 1);
     renderSource(); recompute(); setNow(); checkAlert(); renderAll();
   }
   function goSim() {
+    reqId++; liveBtn(false);                                    // cancels any live load still in flight
     if (!isLive()) return; clearInterval(liveTimer); if (playing) togglePlay();
+    community = []; netLocal = []; feedLoc = null;
     series = simSeries(); stepMin = S.STEP_MIN; source = { kind: 'sim' };
-    cfg.loLabel = E.DEFAULT_CFG.loLabel; cfg.hiLabel = E.DEFAULT_CFG.hiLabel; cfg.skipHiWind = false; cfg.skipShearSpeed = false; cfg.siteOn = simSite; fillForm();
+    cfg.loLabel = E.DEFAULT_CFG.loLabel; cfg.hiLabel = E.DEFAULT_CFG.hiLabel; delete cfg.loWindLabel; delete cfg.uncLabel; cfg.skipHiWind = false; cfg.skipShearSpeed = false; cfg.siteOn = simSite; fillForm();
     $('lat').value = 32.69; $('lon').value = -114.62;
-    renderSource(); recompute(); renderRules(); resetDemo(); applyNetwork(false);
+    renderSource(); recompute(); renderRules(); resetDemo(); pullNetwork(false);
   }
   window.__sowRefresh = refreshLive;
 
@@ -841,13 +881,13 @@
     $('optPush').onchange = () => { if ($('optPush').checked && 'Notification' in window && Notification.permission !== 'granted') { try { Notification.requestPermission(); } catch (e) {} } };
     $('csvSample').onclick = sampleCsv;
     $('csvIn').onchange = e => { const f = e.target.files[0]; if (!f) return; const fr = new FileReader(); fr.onload = () => loadCsv(String(fr.result), f.name); fr.readAsText(f); e.target.value = ''; };
-    $('resetBtn').onclick = () => { if (playing) togglePlay(); clearInterval(liveTimer); cfg = Object.assign({ jobCost: 0 }, E.DEFAULT_CFG); saveCfg(); series = simSeries(); stepMin = S.STEP_MIN; source = { kind: 'sim' }; dropHi = false; $('optDropHi').checked = false; $('cfgErr').hidden = true;
+    $('resetBtn').onclick = () => { if (playing) togglePlay(); clearInterval(liveTimer); reqId++; liveBtn(false); community = []; netLocal = []; feedLoc = null; cfg = Object.assign({ jobCost: 0 }, E.DEFAULT_CFG); saveCfg(); series = simSeries(); stepMin = S.STEP_MIN; source = { kind: 'sim' }; dropHi = false; $('optDropHi').checked = false; $('cfgErr').hidden = true;
       $('lat').value = 32.69; $('lon').value = -114.62; fillForm(); renderSource(); recompute(); renderRules(); resetDemo(); if (fcState) renderForecast(); };
     $('fcBtn').onclick = loadForecast;
     $('fcSec').addEventListener('toggle', () => { if ($('fcSec').open && !fcState) loadForecast(); });
     document.addEventListener('click', e => { const a = e.target.closest('[data-open],#openRecord'); if (!a) return; e.preventDefault(); openSec(a.dataset.open || 'recordSec'); });
     document.querySelectorAll('.qbtn').forEach(b => b.onclick = async () => { b.disabled = true; const ok = await postReport(b.dataset.kind, null); b.disabled = false;
-      $('quickMsg').textContent = ok ? 'Sent to the shared database.' : 'Could not reach the shared database. Kept on this device only.'; });
+      $('quickMsg').textContent = !isLive() ? 'Demo mode. Nothing was sent. Reports are only sent from live mode.' : ok ? 'Sent to the shared database.' : 'Could not reach the shared database. Kept on this device only.'; });
     ['lat', 'lon'].forEach(id => $(id).addEventListener('change', () => applyNetwork(false)));
     $('cropSel').innerHTML = CROPS.map(c => '<option value="' + c.id + '">' + esc(c.name) + '</option>').join('');
     try { const sc = localStorage.getItem('sow_crop'); if (sc && CROPS.find(c => c.id === sc)) $('cropSel').value = sc; } catch (e) {}
@@ -857,7 +897,7 @@
     setCrop(); renderChemTable();
     $('wlBtn').onclick = joinWaitlist; renderQr();
     renderNetwork(); pullNetwork(false); setInterval(() => pullNetwork(true), 8000);
-    window.__sow = { state: () => ({ idx: idx, time: fmtTime(series[idx].min), status: evals[idx].status, ground: evals[idx].ground.status, logLen: log.length, playing: playing, source: source.kind, n: series.length, step: stepMin }) };
+    window.__sow = { state: () => ({ idx: idx, time: fmtTime(series[idx].min), status: evals[idx].status, weather: evals[idx].weather, concerns: evals[idx].concerns.length, feed: netOnline, used: usedCommunity().length, ground: evals[idx].ground.status, logLen: log.length, playing: playing, source: source.kind, n: series.length, step: stepMin }) };
   }
   init();
 })();

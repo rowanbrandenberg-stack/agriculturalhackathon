@@ -58,6 +58,7 @@
   function evaluate(r, cfgIn, meta) {
     const cfg = Object.assign({}, DEFAULT_CFG, cfgIn || {});
     const lo = cfg.loLabel, hi = cfg.hiLabel;
+    const loW = cfg.loWindLabel || lo, unc = cfg.uncLabel || 'sensor uncertainty';
     r = r || {};
     const cfgErr = validateCfg(cfg);
     if (cfgErr.length) return { status: 'UNABLE', level: -1, triggers: [], problems: [{ code: 'BAD_SETTINGS', text: 'Settings are not valid. ' + cfgErr[0] }],
@@ -71,9 +72,9 @@
     if (!stale) {
       if (!V.tLo) problems.push({ code: 'NO_TLO', text: 'No valid temperature from the ' + lo + ' sensor.' });
       if (!V.tHi) problems.push({ code: 'NO_THI', text: 'No valid temperature from the ' + hi + ' sensor.' });
-      if (!V.wLo) problems.push({ code: 'NO_WLO', text: 'No valid wind speed from the ' + lo + ' sensor.' });
+      if (!V.wLo) problems.push({ code: 'NO_WLO', text: 'No valid wind speed from the ' + loW + ' sensor.' });
       if (needHiWind && !V.wHi) problems.push({ code: 'NO_WHI', text: 'No valid wind speed from the ' + hi + ' sensor.' });
-      if (V.wLo && r.wLo >= cfg.calmMph && !V.dLo) problems.push({ code: 'NO_DLO', text: 'No valid wind direction from the ' + lo + ' sensor.' });
+      if (V.wLo && r.wLo >= cfg.calmMph && !V.dLo) problems.push({ code: 'NO_DLO', text: 'No valid wind direction from the ' + loW + ' sensor.' });
       if (needHiWind && V.wHi && r.wHi >= cfg.calmMph && !V.dHi) problems.push({ code: 'NO_DHI', text: 'No valid wind direction from the ' + hi + ' sensor.' });
     }
 
@@ -84,20 +85,20 @@
     if (dT != null && dT > 0) {
       T.push({ code: 'INVERSION', level: 2, title: 'Temperature inversion',
         text: 'Air at ' + hi + ' is ' + f1(dT) + '°F warmer than at ' + lo + '. Upper air warmer than lower air is an inversion. Fine droplets and vapor can stay in a shallow layer and travel sideways.' +
-          (dT < cfg.sensorUnc ? ' This difference is inside the ±' + cfg.sensorUnc + '°F sensor uncertainty, so it may not be a true inversion. The alert is shown anyway because a positive difference is never ignored.' : '') });
+          (dT < cfg.sensorUnc ? ' This difference is inside the ±' + cfg.sensorUnc + '°F ' + unc + ', so it may not be a true inversion. The alert is shown anyway because a positive difference is never ignored.' : '') });
     } else if (dT != null && dT > -cfg.sensorUnc) {
       T.push({ code: 'SMALL_DIFF', level: 1, title: 'Small temperature difference',
         text: (dT === 0 ? 'Air at ' + hi + ' and ' + lo + ' is the same temperature.' : 'Air at ' + hi + ' is only ' + f1(-dT) + '°F cooler than at ' + lo + '.') +
-          ' That is inside the ±' + cfg.sensorUnc + '°F sensor uncertainty of an inversion. Mixing strength is not established by these readings.' });
+          ' That is inside the ±' + cfg.sensorUnc + '°F ' + unc + ' of an inversion. Mixing strength is not established by these readings.' });
     }
 
     // 2. Wind limits at each height
-    if (V.wLo && r.wLo > cfg.windMax) T.push({ code: 'WIND_HIGH_LO', level: 2, title: 'Wind above your limit at ' + lo,
-      text: 'Wind at ' + lo + ' is ' + f1(r.wLo) + ' mph. Your limit is ' + cfg.windMax + ' mph.' });
+    if (V.wLo && r.wLo > cfg.windMax) T.push({ code: 'WIND_HIGH_LO', level: 2, title: 'Wind above your limit at ' + loW,
+      text: 'Wind at ' + loW + ' is ' + f1(r.wLo) + ' mph. Your limit is ' + cfg.windMax + ' mph.' });
     if (needHiWind && V.wHi && r.wHi > cfg.windMax) T.push({ code: 'WIND_HIGH_HI', level: 2, title: 'Wind above your limit at ' + hi,
-      text: 'Wind at ' + hi + ' is ' + f1(r.wHi) + ' mph. Your limit is ' + cfg.windMax + ' mph. A reading at ' + lo + ' alone does not show this.' });
-    if (V.wLo && r.wLo < cfg.windMin) T.push({ code: 'WIND_LOW_LO', level: 1, title: 'Wind below your minimum at ' + lo,
-      text: 'Wind at ' + lo + ' is ' + f1(r.wLo) + ' mph. Your minimum is ' + cfg.windMin + ' mph. Direction is unreliable in near calm air, and calm conditions can accompany an inversion.' });
+      text: 'Wind at ' + hi + ' is ' + f1(r.wHi) + ' mph. Your limit is ' + cfg.windMax + ' mph. A reading at ' + loW + ' alone does not show this.' });
+    if (V.wLo && r.wLo < cfg.windMin) T.push({ code: 'WIND_LOW_LO', level: 1, title: 'Wind below your minimum at ' + loW,
+      text: 'Wind at ' + loW + ' is ' + f1(r.wLo) + ' mph. Your minimum is ' + cfg.windMin + ' mph. Direction is unreliable in near calm air, and calm conditions can accompany an inversion.' });
     if (needHiWind && V.wHi && r.wHi < cfg.windMin) T.push({ code: 'WIND_LOW_HI', level: 1, title: 'Wind below your minimum at ' + hi,
       text: 'Wind at ' + hi + ' is ' + f1(r.wHi) + ' mph. Your minimum is ' + cfg.windMin + ' mph.' });
 
@@ -138,7 +139,7 @@
 
     // 6c. Network check (live model mode): kriging across the whole network says inversion at this site while the site estimate does not.
     if (nb && nb.net && nb.net.v > 0 && !T.some(t => t.code === 'INVERSION' || t.code === 'NEARBY_INVERSION')) T.push({ code: 'NETWORK_INVERSION', level: 1, title: 'The network model shows an inversion here',
-      text: 'Kriging across ' + nb.net.n + ' network points puts the upper air ' + f1(nb.net.v) + '°F warmer than the lower air at this site (give or take ' + f1(nb.net.sd) + '°F), while the farm estimate does not. The two models disagree. Check on site.' });
+      text: 'Kriging across ' + nb.net.n + ' network points puts the upper air ' + f1(nb.net.v) + '°F warmer than the lower air at this site, while the farm estimate does not. The two estimates disagree. Check on site.' });
 
     // 7. Actual community reports nearby. Unverified, so they can only ADD caution.
     const comm = cfg.community || [];
@@ -169,15 +170,21 @@
     // A confirmed STOP from valid readings stands. Otherwise any required reading problem means we cannot assess.
     const status = level === 2 ? 'STOP' : problems.length ? 'UNABLE' : NAMES[level];
 
+    // Weather and site concerns are reported separately. The overall decision above keeps every restriction.
+    const isConcern = t => t.code === 'SITE_DOWNWIND' || /^NET_/.test(t.code);
+    const wxT = T.filter(t => !isConcern(t)), concerns = T.filter(isConcern);
+    const wxLevel = wxT.reduce((m, t) => Math.max(m, t.code === 'SITE_DOWNWIND' ? 0 : t.level), 0);
+    const weather = wxLevel === 2 ? 'STOP' : problems.length ? 'UNABLE' : NAMES[wxLevel];
+
     // What a single ground level station would conclude: wind speed at one height only.
     let g;
-    if (!V.wLo) g = { status: 'UNABLE', text: 'No valid wind reading at ' + lo + '.' };
-    else if (r.wLo > cfg.windMax) g = { status: 'STOP', text: 'Wind ' + f1(r.wLo) + ' mph at ' + lo + ' is over ' + cfg.windMax + ' mph.' };
-    else if (r.wLo < cfg.windMin) g = { status: 'CAUTION', text: 'Wind ' + f1(r.wLo) + ' mph at ' + lo + ' is under ' + cfg.windMin + ' mph.' };
-    else g = { status: 'GO', text: 'Wind ' + f1(r.wLo) + ' mph at ' + lo + ' is inside ' + cfg.windMin + ' to ' + cfg.windMax + ' mph. Wind check passed.' };
+    if (!V.wLo) g = { status: 'UNABLE', text: 'No valid wind reading at ' + loW + '.' };
+    else if (r.wLo > cfg.windMax) g = { status: 'STOP', text: 'Wind ' + f1(r.wLo) + ' mph at ' + loW + ' is over ' + cfg.windMax + ' mph.' };
+    else if (r.wLo < cfg.windMin) g = { status: 'CAUTION', text: 'Wind ' + f1(r.wLo) + ' mph at ' + loW + ' is under ' + cfg.windMin + ' mph.' };
+    else g = { status: 'GO', text: 'Wind ' + f1(r.wLo) + ' mph at ' + loW + ' is inside ' + cfg.windMin + ' to ' + cfg.windMax + ' mph. Wind check passed.' };
 
     return { status, level: status === 'UNABLE' ? -1 : level, triggers: T, problems, dT, shearSpd, shearDir: shearDirDeg, dirReliable,
-      ground: g, missed: g.status === 'GO' && (status === 'CAUTION' || status === 'STOP') };
+      ground: g, weather, concerns, missed: g.status === 'GO' && (weather === 'CAUTION' || weather === 'STOP') };
   }
 
   /* Contiguous GO runs. Each run reports whether it was cut off by the end of the data. */
