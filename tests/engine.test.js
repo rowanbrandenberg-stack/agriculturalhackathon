@@ -115,6 +115,24 @@ t('no nearby inversion: stays GO', ev({}, { nearby: { inv: 0, of: 5, km: 5 } }).
 const nbS = ev({ tHi: 75 }, { nearby: { inv: 5, of: 5, km: 5 } });
 t('site inversion is still STOP and is not double counted', nbS.status === 'STOP' && !has(nbS, 'NEARBY_INVERSION'));
 
+console.log('Network model (ordinary kriging)');
+const grid = []; for (let i = -2; i <= 2; i++) for (let k = -2; k <= 2; k++) if (i || k) grid.push({ lat: 31.97 + i * 0.09, lon: -110.29 + k * 0.106, v: -4 + 0.8 * i + 0.3 * k });
+const kc = SPT.krige(grid, A);
+t('kriging a smooth field lands near the true value at the centre', Math.abs(kc.v - (-4)) < 0.3 && kc.n === 24, JSON.stringify(kc));
+t('kriging reports an uncertainty above zero away from the points', kc.sd > 0);
+const kAt = SPT.krige(grid, grid[5]);
+t('kriging is exact at a data point, with no uncertainty', Math.abs(kAt.v - grid[5].v) < 1e-6 && kAt.sd < 1e-3, JSON.stringify(kAt));
+const far = SPT.krige(grid, { lat: 33.5, lon: -112 });
+t('uncertainty grows far from the network', far.sd > kc.sd, far.sd + ' vs ' + kc.sd);
+const flat = SPT.krige(grid.map(p => ({ lat: p.lat, lon: p.lon, v: -3 })), A);
+t('a network that agrees everywhere returns that value', flat.v === -3 && flat.sd === 0);
+t('too few points gives no estimate instead of a guess', SPT.krige(grid.slice(0, 2), A) === null);
+t('kriging skips missing values', SPT.krige(grid.concat([{ lat: 32, lon: -110.3, v: null }]), A).n === 24);
+const nk = ev({}, { nearby: { inv: 0, of: 5, km: 5, net: { v: 1.2, sd: 0.5, n: 24 } } });
+t('network says inversion, farm model does not: CAUTION', nk.status === 'CAUTION' && has(nk, 'NETWORK_INVERSION'), nk.status);
+t('network and farm both say no inversion: GO', ev({}, { nearby: { inv: 0, of: 5, km: 5, net: { v: -2, sd: 0.5, n: 24 } } }).status === 'GO');
+t('farm inversion stays STOP whatever the network says', ev({ tHi: 75 }, { nearby: { inv: 0, of: 5, km: 5, net: { v: -2, sd: 0.5, n: 24 } } }).status === 'STOP');
+
 console.log('Crop, pest and chemical reference');
 global.window = {}; require('../pests.js');
 const PP = window.SprayPests, CC = window.SprayCrops, KK = window.SprayChems;

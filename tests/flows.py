@@ -16,7 +16,7 @@ async def main():
             day = 8 <= hr <= 17
             t2.append(70.0 if day else 50.0); t80.append(66.0 if day else 56.0)
             w10.append(5.0 if day else 4.0); w80.append(15.0); dd10.append(330); dd80.append(300)
-        MOCK = json.dumps([{'utc_offset_seconds': 0, 'hourly': {'time': T, 'temperature_2m': t2, 'temperature_80m': t80, 'wind_speed_10m': w10, 'wind_speed_80m': w80, 'wind_direction_10m': dd10, 'wind_direction_80m': dd80}}] * 5)
+        MOCK = json.dumps([{'utc_offset_seconds': 0, 'hourly': {'time': T, 'temperature_2m': t2, 'temperature_80m': t80, 'wind_speed_10m': w10, 'wind_speed_80m': w80, 'wind_direction_10m': dd10, 'wind_direction_80m': dd80}}] * 29)
         live_ok = {'v': True}
         async def wx(route):
             if live_ok['v']: await route.fulfill(status=200, content_type='application/json', body=MOCK, headers={'access-control-allow-origin': '*'})
@@ -118,6 +118,7 @@ async def main():
         ck('live: opens on the current hour with the expected call', s['status']==exp, (s, exp))
         ck('live: labelled as a regional model for the SouthWinds Farm area', 'Live regional model' in await txt('#srcTag') and 'SouthWinds Farm area' in await txt('#blockName') and 'No tower is installed' in await txt('#liveNote'))
         ck('live: site value is an inverse distance weighted estimate from 5 model points', 'inverse distance weighted estimate from 5 model points' in await txt('#liveNote'), await txt('#liveNote'))
+        ck('live: network kriging is compared with the farm IDW model', await pg.is_visible('#krigBox') and 'Models agree' in await txt('#krigBox') and '24 points' in await txt('#krigBox') and 'do not exist yet' in await txt('#krigBox'), await txt('#krigBox'))
         ck('live: demo scenarios hidden, go to now shown', not await pg.is_visible('#scen') and await pg.is_visible('#liveNow'))
         ck('live: 260 ft model wind is not judged against the canopy limit', 'limit at 260 ft' not in await txt('#reasons') and 'Live model mode' in await txt('#rulesLine'), await txt('#reasons'))
         ck('live: the invented demo school is not shown at a real place', 'school' not in await txt('#reasons') and 'school' not in await txt('#blockTxt'), await txt('#reasons'))
@@ -129,6 +130,7 @@ async def main():
         live_ok['v'] = True
         await pg.evaluate("document.getElementById('modeSim').click()"); await pg.wait_for_timeout(500); s = await st()
         ck('back to demo day: 6:10 AM STOP with 30 ft labels', s['source']=='sim' and s['time']=='6:10 AM' and s['status']=='STOP' and 'Air at 30 ft' in await txt('#reasons') and await pg.is_visible('#scen'), s)
+        ck('demo day hides the network comparison', not await pg.is_visible('#krigBox'))
         # crops, pests, chemicals
         ck('ten crops, citrus first', await pg.evaluate("document.getElementById('cropSel').options.length")==10 and await pg.evaluate("document.getElementById('cropSel').value")=='citrus')
         await pg.select_option('#cropSel','cotton'); await pg.select_option('#pestPick','lygus'); await pg.wait_for_timeout(200)

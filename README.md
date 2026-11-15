@@ -93,7 +93,11 @@ Live mode reads five model points: the site and four points 5 km north, east, so
 
 If any of the five points shows an inversion while the site estimate does not, the status drops to CAUTION ("Inversion at nearby model points"), because inversions are patchy.
 
-Kriging is not implemented. It needs enough real stations to fit a variogram for the area, and this prototype has model points only. With a network of towers, kriging would replace IDW in one function (`idwReading`) and would also give an uncertainty for each estimate.
+### Network model (kriging) compared with the farm model (IDW)
+
+Live mode runs a second, independent model. Ordinary kriging is fitted across 24 network points on a 10 km grid around the farm (40 km across), leaving out the farm's own points. The variogram is refitted from the points every hour, and the estimate comes with its own uncertainty. A panel shows the farm IDW value, the network kriging value, and whether they agree. If the network model says inversion and the farm model does not, the status drops to CAUTION. A farm level inversion is still a STOP whatever the network says.
+
+Honest limit: no member farm has a tower yet. The 24 network points are regional model points standing in for member farm towers, and the page says so. With real towers the same code runs on measurements.
 
 
 ## Crop, pest and chemical reference
@@ -110,7 +114,7 @@ This is a reference for the conversation with a PCA, not a prescription. All dat
 
 ```
 node tests/engine.test.js      # 64 decision logic checks, no dependencies
-python3 tests/flows.py [url]   # 66 user flow checks in a headless browser (needs Playwright and Chrome)
+python3 tests/flows.py [url]   # 68 user flow checks in a headless browser (needs Playwright and Chrome)
 ```
 
 ## Files

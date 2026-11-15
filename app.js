@@ -3,7 +3,7 @@
   const E = window.SprayEngine, S = window.SpraySim;
   const $ = id => document.getElementById(id);
   const f1 = E.f1;
-  const BUILD = '2026-11-15.13';
+  const BUILD = '2026-11-15.14';
   /* Live mode: a real location, real model weather. Rounded coordinates for the area, not the farm's address. No tower is installed there. */
   const FARM = { name: 'SouthWinds Farm area', place: 'near Benson, Arizona', lat: 31.97, lon: -110.29 };
   const BLOCK_SIM = 'Block 7, lemons, Yuma County, Arizona';
@@ -441,7 +441,7 @@
   }
 
   /* ---------- playback and scenarios ---------- */
-  function renderAll() { renderStatus(); renderJob(); renderTower(); renderCompass(); renderTimeline(); renderSession(); renderNeighbor(); renderWWW(); }
+  function renderAll() { renderStatus(); renderJob(); renderTower(); renderCompass(); renderTimeline(); renderSession(); renderNeighbor(); renderWWW(); renderKrig(); }
   function stepOnce() { if (idx >= series.length - 1) { if (playing) togglePlay(); return; } idx++; setNow(); checkAlert(); renderAll(); }
   function togglePlay() {
     playing = !playing; $('play').textContent = playing ? 'Pause' : 'Play'; $('play').classList.toggle('playing', playing);
@@ -487,7 +487,7 @@
     $('scen').hidden = isLive(); $('liveNow').hidden = !isLive(); $('demoReset').hidden = isLive();
     $('liveNote').hidden = !isLive();
     document.querySelector('.gtitle').textContent = isLive() ? 'Ground only comparison: model wind near the ground' : 'Ground station comparison: wind at 5 ft only';
-    if (isLive()) $('liveNote').innerHTML = '<span class="srcTag">Live regional model</span> Real weather model values for the ' + FARM.name + ' ' + FARM.place + ', fetched ' + source.fetched.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) + ' and refreshed every 10 minutes. Temperature at 2 m and 80 m, wind at 10 m and 80 m (Open-Meteo). ' + (livePts > 1 ? 'The site value is an inverse distance weighted estimate from ' + livePts + ' model points within ' + RING_KM + ' km, and the tool warns when those points disagree about an inversion.' : '') + ' <b>No tower is installed at the farm.</b> A regional model does not resolve one field, so treat this as the best available estimate until a two height tower is on site. Hours after now are forecast.';
+    if (isLive()) $('liveNote').innerHTML = '<span class="srcTag">Live regional model</span> Real weather model values for the ' + FARM.name + ' ' + FARM.place + ', fetched ' + source.fetched.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) + ' and refreshed every 10 minutes. Temperature at 2 m and 80 m, wind at 10 m and 80 m (Open-Meteo). ' + (livePts > 1 ? 'The site value is an inverse distance weighted estimate from ' + livePts + ' model points within ' + RING_KM + ' km, and the tool warns when those points disagree about an inversion.' + (liveNet ? ' A second model kriges ' + liveNet + ' network points across 40 km and is compared with the farm model below.' : '') : '') + ' <b>No tower is installed at the farm.</b> A regional model does not resolve one field, so treat this as the best available estimate until a two height tower is on site. Hours after now are forecast.';
     $('srcLabel').textContent = source.kind === 'sim' ? 'Sensors at 5 ft and 30 ft, one reading every ' + stepMin + ' minutes. Not live.'
       : isLive() ? 'Open-Meteo model for the area, hourly. Not a measurement at the farm.'
       : 'File ' + source.file + ', ' + source.rows + ' readings measured ' + fmtTime(source.first) + ' to ' + fmtTime(source.last) + '. Last reading ' + fmtTime(source.last) + '. A file is not a live feed.';
@@ -743,13 +743,26 @@
   }
 
   /* ---------- live mode: real model weather for a real location ---------- */
-  let liveTimer = null, followNow = true, simSite = true, livePts = 1;
+  let liveTimer = null, followNow = true, simSite = true, livePts = 1, liveNet = 0;
   const SP = window.SpraySpatial;
+  function renderKrig() {
+    const box = $('krigBox'), s = series[idx], kr = isLive() && s.near && s.near.net; box.hidden = !kr; if (!kr) return;
+    const r = s.r, idwDT = r.tHi - r.tLo, words = d => Math.abs(d) < 0.05 ? 'no difference between heights' : f1(Math.abs(d)) + '\u00B0F ' + (d > 0 ? 'warmer' : 'cooler') + ' aloft';
+    const agree = (kr.v > 0) === (idwDT > 0), gap = Math.abs(kr.v - idwDT);
+    box.innerHTML = '<div class="kg"><div><span>Farm model, IDW</span><b>' + words(idwDT) + '</b><i>' + livePts + ' points within ' + RING_KM + ' km</i></div>' +
+      '<div><span>Network model, kriging</span><b>' + words(kr.v) + '</b><i>' + kr.n + ' points across 40 km, give or take ' + f1(kr.sd) + '\u00B0F</i></div>' +
+      '<div><span>Compare</span><b class="' + (agree ? 'kok' : 'kbad') + '">' + (agree ? 'Models agree' : 'Models disagree') + '</b><i>' + f1(gap) + '\u00B0F apart' + (agree ? '' : '. The stricter one decides') + '</i></div></div>' +
+      '<div class="muted small">The network model does not use this farm\u2019s own points, so the two are independent checks. Demo network: model points stand in for member farm towers, which do not exist yet.</div>';
+  }
   function nowIdx() { if (!isLive()) return idx; const d = new Date(), m = d.getHours() * 60; let best = 0; series.forEach((s, i) => { if (s.min <= m) best = i; }); return best; }
   const RING_KM = 5;
   function livePoints() {   // the site plus four points 5 km north, east, south and west
     const dLat = RING_KM / 111.2, dLon = RING_KM / (111.2 * Math.cos(FARM.lat * Math.PI / 180)), r4 = v => Math.round(v * 1e4) / 1e4;
-    return [[0, 0], [dLat, 0], [0, dLon], [-dLat, 0], [0, -dLon]].map(o => ({ lat: r4(FARM.lat + o[0]), lon: r4(FARM.lon + o[1]) }));
+    const local = [[0, 0], [dLat, 0], [0, dLon], [-dLat, 0], [0, -dLon]].map(o => ({ lat: r4(FARM.lat + o[0]), lon: r4(FARM.lon + o[1]) }));
+    /* Stand in for the company network: a 5 by 5 grid of model points 10 km apart, without the farm's own point. No member farm has a tower yet. */
+    const net = [];
+    for (let i = -2; i <= 2; i++) for (let k = -2; k <= 2; k++) if (i || k) net.push({ lat: r4(FARM.lat + i * 2 * dLat), lon: r4(FARM.lon + k * 2 * dLon), net: true });
+    return local.concat(net);
   }
   async function fetchLive() {
     const P = livePoints();
@@ -760,11 +773,12 @@
     const good = j.map((x, k) => ({ p: P[k], hh: x && x.hourly })).filter(x => x.p && x.hh && x.hh.time && x.hh.time.length >= 24);
     if (!good.length) throw new Error('unexpected response');
     const T0 = good[0].hh.time, d0 = T0[0].slice(0, 10), nn = v => (typeof v === 'number' && isFinite(v)) ? v : null;
-    livePts = good.length;
+    livePts = good.filter(g => !g.p.net).length; liveNet = good.filter(g => g.p.net).length;
     return T0.map((t, i) => {
-      const pts = good.map(g => ({ lat: g.p.lat, lon: g.p.lon, r: { tLo: nn(g.hh.temperature_2m[i]), tHi: nn(g.hh.temperature_80m[i]), wLo: nn(g.hh.wind_speed_10m[i]), wHi: nn(g.hh.wind_speed_80m[i]), dLo: nn(g.hh.wind_direction_10m[i]), dHi: nn(g.hh.wind_direction_80m[i]) } }));
-      const c = SP.inversionCount(pts);
-      return { min: (t.slice(0, 10) === d0 ? 0 : 1440) + (+t.slice(11, 13)) * 60, ageMin: 0, r: SP.idwReading(pts, FARM), near: pts.length > 1 ? { inv: c.inv, of: c.of, km: RING_KM } : null };
+      const all = good.map(g => ({ net: !!g.p.net, lat: g.p.lat, lon: g.p.lon, r: { tLo: nn(g.hh.temperature_2m[i]), tHi: nn(g.hh.temperature_80m[i]), wLo: nn(g.hh.wind_speed_10m[i]), wHi: nn(g.hh.wind_speed_80m[i]), dLo: nn(g.hh.wind_direction_10m[i]), dHi: nn(g.hh.wind_direction_80m[i]) } }));
+      const pts = all.filter(p => !p.net), netPts = all.filter(p => p.net).map(p => ({ lat: p.lat, lon: p.lon, v: (p.r.tLo != null && p.r.tHi != null) ? p.r.tHi - p.r.tLo : null }));
+      const c = SP.inversionCount(pts), kr = netPts.length >= 8 ? SP.krige(netPts, FARM) : null;
+      return { min: (t.slice(0, 10) === d0 ? 0 : 1440) + (+t.slice(11, 13)) * 60, ageMin: 0, r: SP.idwReading(pts, FARM), near: pts.length > 1 || kr ? { inv: pts.length > 1 ? c.inv : 0, of: c.of, km: RING_KM, net: kr } : null };
     }).slice(0, 48);
   }
   async function goLive() {

@@ -136,6 +136,10 @@
     if (nb && nb.inv > 0 && !T.some(t => t.code === 'INVERSION')) T.push({ code: 'NEARBY_INVERSION', level: 1, title: 'Inversion at nearby model points',
       text: nb.inv + ' of ' + nb.of + ' model points within ' + nb.km + ' km show warmer air above cooler air, while the estimate for this site does not. Inversions are patchy. Check on site.' });
 
+    // 6c. Network check (live model mode): kriging across the whole network says inversion at this site while the site estimate does not.
+    if (nb && nb.net && nb.net.v > 0 && !T.some(t => t.code === 'INVERSION' || t.code === 'NEARBY_INVERSION')) T.push({ code: 'NETWORK_INVERSION', level: 1, title: 'The network model shows an inversion here',
+      text: 'Kriging across ' + nb.net.n + ' network points puts the upper air ' + f1(nb.net.v) + '°F warmer than the lower air at this site (give or take ' + f1(nb.net.sd) + '°F), while the farm estimate does not. The two models disagree. Check on site.' });
+
     // 7. Actual community reports nearby. Unverified, so they can only ADD caution.
     const comm = cfg.community || [];
     const closest = a => a.slice().sort((x, y) => x.distMi - y.distMi)[0];

@@ -341,3 +341,12 @@ details.sec>summary:hover{background:var(--soft)}
 .chemT{border-collapse:collapse;width:100%;font-size:13.5px;min-width:720px}
 .chemT th{text-align:left;font-weight:600;font-size:12.5px;color:var(--mut);padding:6px 10px 6px 0;border-bottom:1px solid var(--ink)}
 .chemT td{vertical-align:top;padding:8px 10px 8px 0;border-bottom:1px solid var(--rule)}
+
+/* farm IDW against network kriging */
+.krig{border:1px solid var(--rule);padding:12px 14px;margin-bottom:14px;background:var(--paper)}
+.kg{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin-bottom:8px}
+.kg span{display:block;font-size:12.5px;color:var(--mut)}
+.kg b{display:block;font:600 22px/1.15 var(--display);letter-spacing:.01em}
+.kg i{display:block;font-style:normal;font-size:12.5px;color:var(--mut)}
+.kok{color:var(--go)}.kbad{color:var(--st)}
+@media (max-width:640px){.kg{grid-template-columns:minmax(0,1fr);gap:8px}}
